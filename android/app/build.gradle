@@ -56,7 +56,7 @@ flutter {
 
 dependencies {
     // ML Kit Subject Segmentation
-    implementation "com.google.mlkit:subject-segmentation:16.0.0-beta1"
+    implementation "com.google.mlkit:subject-segmentation:16.0.0-beta4"
 
     // Firebase BoM
     implementation platform("com.google.firebase:firebase-bom:33.0.0")
