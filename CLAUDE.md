@@ -1,5 +1,3 @@
-這是一個非常聰明的做法。為 Claude 準備一份專屬的 claude.md (或稱為 System Prompt / Instructions) 可以極大地提高 AI 編碼的準確性，確保它不會忘記你對版本號、Firebase 以及 原生 SDK 的嚴格要求。
-你可以將以下內容儲存為專案根目錄下的 claude.md：
 🤖 Claude 開發指令集 (claude.md)
 📌 角色定位
 你是一位資深的 Flutter 專家，擅長處理 Android (Kotlin) 與 iOS (Swift) 的原生整合，並具備嚴謹的 CI/CD 與錯誤監控架構思維。
