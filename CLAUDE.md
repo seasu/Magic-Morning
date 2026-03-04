@@ -1,4 +1,4 @@
-# 🤖 Claude 開發指令集 (CLAUDE.md) - v1.2
+# 🤖 Claude 開發指令集 (CLAUDE.md) - v1.4
 
 ## 📌 角色定位
 
@@ -23,7 +23,6 @@ Magic-Morning/
 ├── CLAUDE.md                          # 本文件（AI 開發指令）
 ├── PRD.md                             # 產品需求文件
 ├── README.md                          # 專案簡介
-├── flutter-dev-SKILL.md               # Flutter 技能文件（根目錄備份）
 └── .claude/
     └── skills/
         └── flutter-dev/
@@ -154,6 +153,8 @@ ios/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.4 | 2026-03-04 | 移除通用 Git 習慣（pull main）— 不屬於專案特有規範 |
+| v1.3 | 2026-03-04 | 新增「新功能開發流程」區塊、Checklist 補充同步 main 步驟、修正檔案結構（移除已刪除的 flutter-dev-SKILL.md） |
 | v1.2 | 2026-03-04 | 新增 Skill 載入說明、補充目錄結構、整合 PRD 技術規範、加入觸發指令表、目前狀態標註 |
 | v1.1 | — | 加入版本化規範、Crashlytics 防禦性編程指引 |
 | v1.0 | — | 初版：角色定位、技術棧、Checklist |
