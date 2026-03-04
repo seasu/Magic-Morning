@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -36,10 +35,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   Future<void> _export() async {
     FirebaseService.log('EditorScreen._export: start');
-    final notifier = ref.read(editorStateProvider(widget.imagePath).notifier);
-    ref
-        .read(editorStateProvider(widget.imagePath).notifier)
-        .updateCaption(ref.read(editorStateProvider(widget.imagePath)).caption);
 
     try {
       final boundary = _repaintKey.currentContext!.findRenderObject()
