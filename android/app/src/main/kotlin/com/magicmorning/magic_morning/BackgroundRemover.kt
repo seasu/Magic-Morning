@@ -44,6 +44,7 @@ object BackgroundRemover {
 
                     val mask = result.foregroundConfidenceMask
                         ?: throw IllegalStateException("Confidence mask is null")
+                    val maskArray = FloatArray(mask.remaining()).also { mask.get(it) }
 
                     val output = Bitmap.createBitmap(
                         bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888,
@@ -55,7 +56,7 @@ object BackgroundRemover {
                     // Alpha masking：信心度 < 0.5 的像素設為透明
                     paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
                     val maskBitmap = confidenceMaskToBitmap(
-                        mask, bitmap.width, bitmap.height,
+                        maskArray, bitmap.width, bitmap.height,
                     )
                     canvas.drawBitmap(maskBitmap, 0f, 0f, paint)
                     maskBitmap.recycle()
