@@ -143,6 +143,32 @@ jobs:
           make_latest: true
           fail_on_unmatched_files: true
 
+  # ─── Firebase App Distribution ────────────────────────────
+  firebase-distribute:
+    name: Firebase App Distribution
+    runs-on: ubuntu-latest
+    needs: android-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: dist/
+
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID_ANDROID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          groups: testers
+          file: dist/app-release.apk
+          releaseNotes: |
+            版本：${{ github.ref_name }}
+            Commit：${{ github.sha }}
+
   # ─── iOS Build（暫停：待取得 Apple Developer 帳號後啟用）────
   # ios-build:
   #   name: iOS Build
