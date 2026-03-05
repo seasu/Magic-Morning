@@ -16,6 +16,7 @@ import '../models/sticker_config.dart';
 /// 畫布比例 740 : 640（LINE 高解析標準）
 class StickerCanvas extends StatelessWidget {
   final Uint8List? subjectBytes;
+  final Uint8List? generatedImage;
   final String text;
   final StickerConfig config;
 
@@ -24,6 +25,7 @@ class StickerCanvas extends StatelessWidget {
   const StickerCanvas({
     super.key,
     required this.subjectBytes,
+    this.generatedImage,
     required this.text,
     required this.config,
   });
@@ -37,19 +39,28 @@ class StickerCanvas extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // ── 彩色粗外框 ─────────────────────────────────────────
-            _BorderFrame(color: config.colorScheme.borderColor),
+            if (generatedImage != null) ...[
+              // ── AI 生成插圖作為完整背景 ──────────────────────────
+              Image.memory(
+                generatedImage!,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.high,
+              ),
+            ] else ...[
+              // ── 彩色粗外框 ─────────────────────────────────────────
+              _BorderFrame(color: config.colorScheme.borderColor),
 
-            // ── 背景裝飾（主體後方） ──────────────────────────────
-            ..._buildDecorations(foreground: false),
+              // ── 背景裝飾（主體後方） ──────────────────────────────
+              ..._buildDecorations(foreground: false),
 
-            // ── 主體去背圖像 ─────────────────────────────────────
-            _buildSubject(),
+              // ── 主體去背圖像 ─────────────────────────────────────
+              _buildSubject(),
 
-            // ── 前景裝飾（主體前方，部分重疊） ───────────────────
-            ..._buildDecorations(foreground: true),
+              // ── 前景裝飾（主體前方，部分重疊） ───────────────────
+              ..._buildDecorations(foreground: true),
+            ],
 
-            // ── LINE 貼圖風格大字 ─────────────────────────────────
+            // ── LINE 貼圖風格大字（永遠疊在最上層）──────────────────
             Positioned(
               left: 14,
               right: 14,
