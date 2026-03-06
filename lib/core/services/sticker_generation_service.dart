@@ -6,13 +6,27 @@ import 'package:http/http.dart' as http;
 
 import 'firebase_service.dart';
 
+/// 貼圖規格：情感主題 + 背景色 + 中文標語
+class _StickerSpec {
+  final String text;
+  final String bgColor;
+  final String emotion;
+
+  const _StickerSpec({
+    required this.text,
+    required this.bgColor,
+    required this.emotion,
+  });
+}
+
 /// Gemini 2.0 Flash 圖片生成服務
 ///
-/// 針對使用者上傳的照片，呼叫 Gemini 2.0 Flash Experimental 產生
-/// 3 種配色的 LINE 貼圖插圖（**不含文字**；文字由 Flutter 疊上）。
-///
-/// API 文件：
-/// https://ai.google.dev/gemini-api/docs/image-generation
+/// 針對使用者上傳的照片，一次生成 8 張 LINE 貼圖。
+/// 每張貼圖為圓形設計，包含：
+/// - 彩色實心圓形背景
+/// - 根據照片人臉繪製的 Q 版卡通頭像
+/// - 特定情緒表情與裝飾
+/// - 中文情感標語（直接嵌入圖中）
 ///
 /// 注意：需在 dart-define 設定 GEMINI_API_KEY
 class StickerGenerationService {
@@ -22,37 +36,72 @@ class StickerGenerationService {
       'https://generativelanguage.googleapis.com/v1beta'
       '/models/gemini-2.0-flash-exp:generateContent';
 
-  /// 每種貼圖的主色調描述（傳入 prompt 影響配色）
-  static const _kPalettes = [
-    'warm orange and sunny yellow — energetic, bright, cheerful',
-    'soft cherry pink and coral — cute, sweet, kawaii',
-    'fresh cyan blue and aqua — cool, playful, refreshing',
+  /// 8 張貼圖的情感主題設定（對應 LINE 標準貼圖 8 情感組合）
+  static const _kStickers = [
+    _StickerSpec(
+      text: '哈囉！',
+      bgColor: 'warm peach orange #F4A261',
+      emotion: 'cheerfully waving hello with big friendly smile',
+    ),
+    _StickerSpec(
+      text: '太棒了！',
+      bgColor: 'sky blue #74C0FC',
+      emotion: 'excited thumbs-up gesture with sparkle stars ✨★ around the face',
+    ),
+    _StickerSpec(
+      text: '真的嗎？',
+      bgColor: 'golden yellow #FFD43B',
+      emotion: 'shocked wide eyes with large question marks ？ flying around',
+    ),
+    _StickerSpec(
+      text: '尷尬了...',
+      bgColor: 'soft cherry pink #FFB3C6',
+      emotion: 'embarrassed blushing with nervous smile and sweat drop 💧 on forehead',
+    ),
+    _StickerSpec(
+      text: '哼！',
+      bgColor: 'deep red #FF6B6B',
+      emotion: 'angry frowning with flames 🔥 erupting around the head',
+    ),
+    _StickerSpec(
+      text: '開心！',
+      bgColor: 'fresh mint green #63E6BE',
+      emotion: 'joyfully laughing with rainbow 🌈 and colorful confetti in background',
+    ),
+    _StickerSpec(
+      text: '我想想...',
+      bgColor: 'soft lavender #C084FC',
+      emotion: 'thoughtfully rubbing chin with a thought bubble ？ floating above',
+    ),
+    _StickerSpec(
+      text: '再見囉！',
+      bgColor: 'baby blue #ADE8F4',
+      emotion: 'cheerfully waving goodbye wearing cool sunglasses 😎 with sparkles',
+    ),
   ];
 
-  /// 同時生成 3 張貼圖插圖，各自獨立，若某張失敗回傳 null（使用 Flutter fallback）
-  ///
-  /// 呼叫者應在背景執行，不阻塞 UI。
+  /// 並行生成全部 8 張貼圖；每張失敗時回傳 null（使用 Flutter fallback）
   Future<List<Uint8List?>> generateAll(Uint8List photoBytes) async {
-    FirebaseService.log('StickerGenerationService.generateAll: start');
-    // 3 張並行生成（speed > 3× sequential）
+    FirebaseService.log('StickerGenerationService.generateAll: start (8 stickers)');
     final results = await Future.wait(
-      List.generate(3, (i) => generateOne(photoBytes, i)),
+      List.generate(_kStickers.length, (i) => generateOne(photoBytes, i)),
     );
     await FirebaseAnalytics.instance
         .logEvent(name: 'sticker_images_generated');
     return results;
   }
 
-  /// 生成單張貼圖插圖，[styleIndex] 決定配色（0=橘、1=粉、2=藍）
-  Future<Uint8List?> generateOne(Uint8List photoBytes, int styleIndex) async {
+  /// 生成單張貼圖，[index] 對應 _kStickers 的情感主題
+  Future<Uint8List?> generateOne(Uint8List photoBytes, int index) async {
+    final spec = _kStickers[index % _kStickers.length];
     FirebaseService.log(
-        'StickerGenerationService.generateOne: style=$styleIndex');
+        'StickerGenerationService.generateOne: index=$index text=${spec.text}');
     try {
       final body = jsonEncode({
         'contents': [
           {
             'parts': [
-              {'text': _buildPrompt(_kPalettes[styleIndex % 3])},
+              {'text': _buildPrompt(spec)},
               {
                 'inlineData': {
                   'mimeType': 'image/jpeg',
@@ -63,7 +112,6 @@ class StickerGenerationService {
           }
         ],
         'generationConfig': {
-          // IMAGE 輸出需明確指定 responseModalities
           'responseModalities': ['IMAGE', 'TEXT'],
         },
       });
@@ -79,7 +127,7 @@ class StickerGenerationService {
       if (response.statusCode != 200) {
         FirebaseService.log(
           'StickerGenerationService: HTTP ${response.statusCode} '
-          'for style=$styleIndex — ${response.body.substring(0, 200)}',
+          'for index=$index — ${response.body.substring(0, 200)}',
         );
         return null;
       }
@@ -96,7 +144,7 @@ class StickerGenerationService {
             final bytes =
                 base64Decode(part['inlineData']['data'] as String);
             FirebaseService.log(
-                'StickerGenerationService: style=$styleIndex done '
+                'StickerGenerationService: index=$index done '
                 '(${bytes.lengthInBytes} bytes)');
             return bytes;
           }
@@ -104,7 +152,7 @@ class StickerGenerationService {
       }
 
       FirebaseService.log(
-          'StickerGenerationService: no image part for style=$styleIndex');
+          'StickerGenerationService: no image part for index=$index');
       return null;
     } catch (e, stack) {
       await FirebaseService.recordError(
@@ -114,29 +162,36 @@ class StickerGenerationService {
     }
   }
 
-  /// Gemini prompt：要求生成 LINE 貼圖插圖（**不含文字**）
+  /// 建立 Gemini prompt：生成圓形 LINE 貼圖，內含卡通頭像與文字
   ///
-  /// 關鍵設計原則：
-  /// 1. 明確要求白底
-  /// 2. Q 版/Chibi 卡通風格
-  /// 3. 不要在圖中放文字（文字由 Flutter 疊加）
-  /// 4. 四周保留 80px 空間給文字氣泡
-  /// 5. 加入 LINE 貼圖特有的裝飾（閃光、外框線）
-  String _buildPrompt(String palette) => '''
-You are a professional LINE sticker illustrator. Draw ONE cute LINE sticker illustration based on the subject in the provided photo.
+  /// 設計原則：
+  /// 1. 圓形背景填色（指定色票）
+  /// 2. 根據照片人臉繪製 Q 版卡通頭像
+  /// 3. 情緒表情由 [spec.emotion] 決定
+  /// 4. 中文標語 [spec.text] 直接嵌入圓圈底部
+  /// 5. 加入 LINE 貼圖特有裝飾（閃光、星星）
+  String _buildPrompt(_StickerSpec spec) => '''
+You are a professional LINE sticker illustrator. Create ONE circular LINE sticker based on the person's face in the provided photo.
 
-Art direction:
-- Color palette: $palette
-- Pure WHITE background (mandatory — no gradients, no patterns)
-- Illustrate the main subject (person, pet, or object) in a cute chibi/Q-version cartoon style
-- The subject should be simplified, round, with big expressive eyes and exaggerated cute features
-- Add sparkle decorations (✦ ✨ ★ small stars/hearts) scattered around the subject
-- Draw a thick colored rounded-rectangle border (5–6 px) matching the palette
-- Canvas aspect ratio: 740 wide : 640 tall
-- Leave the bottom 80px of the canvas EMPTY (white) — this space is reserved for text overlay
-- Do NOT draw any text or letters anywhere in the image
-- Style references: LINE Friends, Molang, Gudetama, Chiikawa — clean professional sticker quality
+STICKER DESIGN SPECIFICATIONS:
+- Canvas: 370 × 370 px square, pure WHITE background outside the circle
+- Main shape: A large filled circle (340px diameter, centered) with solid background color: ${spec.bgColor}
+- Face: Draw a CUTE CHIBI/Q-VERSION cartoon face of the person in the photo
+  * Simplify the face into rounded cute features: big sparkly eyes, small nose, chubby cheeks
+  * The cartoon face should fill about 60-70% of the circle area (upper portion)
+  * Expression: ${spec.emotion}
+  * Style: clean flat illustration, thick outlines (2-3px), no photo-realism
+- Chinese text: Write "${spec.text}" in bold rounded Chinese font
+  * Position: bottom 25% area INSIDE the circle
+  * Text color: WHITE with dark drop shadow for readability
+  * Font size: large (approx 36-40px equivalent), bold, clearly legible
+- Decorations inside the circle: add 3-5 small sparkle/star elements (✦ ★ ✨ small hearts or themed icons)
+  * Scatter around the face and near the text
+  * Colors should complement the background
 
-Output: The sticker illustration image only. No captions, no explanations.
+STYLE REFERENCES: LINE Friends, Chiikawa, Molang — professional sticker quality with clean illustration
+IMPORTANT: The circle must have a thick white outline (4px) to separate it from white background. Do NOT add text outside the circle. Keep design simple and cute.
+
+Output: The sticker image only. No captions or explanations.
 ''';
 }

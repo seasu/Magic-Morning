@@ -118,14 +118,17 @@ class _StickerCanvasState extends State<StickerCanvas> {
                 _BorderFrame(color: widget.config.colorScheme.borderColor),
             ],
 
-            // ── LINE 貼圖風格大字（永遠疊在最上層）──────────────────
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: 12,
-              child: _OutlinedStickerText(
-                  text: widget.text, config: widget.config),
-            ),
+            // ── LINE 貼圖風格大字（僅在 AI 圖未生成時作 fallback 顯示）──
+            // 當 AI 圖已到達時，文字已內嵌於圖中，不再疊加 Flutter 文字
+            if (widget.generatedImage == null ||
+                widget.generatedImage!.isEmpty)
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 12,
+                child: _OutlinedStickerText(
+                    text: widget.text, config: widget.config),
+              ),
           ],
       ),
     );

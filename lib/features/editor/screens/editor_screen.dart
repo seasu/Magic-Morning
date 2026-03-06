@@ -36,7 +36,7 @@ class EditorScreen extends ConsumerStatefulWidget {
 }
 
 class _EditorScreenState extends ConsumerState<EditorScreen> {
-  final _repaintKeys = List.generate(3, (_) => GlobalKey());
+  final _repaintKeys = List.generate(8, (_) => GlobalKey());
   final _cardController = StickerSwipeCardController();
 
   int _currentIndex = 0;
@@ -118,7 +118,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final isLoading = state.status == EditorStatus.removingBackground ||
         state.status == EditorStatus.generatingTexts;
     final isReady = state.status == EditorStatus.ready;
-    final isDone = isReady && _currentIndex >= 3;
+    final isDone = isReady && _currentIndex >= 8;
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -251,7 +251,7 @@ class _ProgressBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(3, (i) {
+        children: List.generate(8, (i) {
           final isActive = i == current;
           final isPast = i < current;
           return Expanded(
@@ -300,7 +300,7 @@ class _CardStack extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         // 下下張（最底層，更小）
-        if (currentIndex + 2 < 3)
+        if (currentIndex + 2 < 8)
           Transform.scale(
             scale: 0.88,
             child: Opacity(
@@ -316,7 +316,7 @@ class _CardStack extends StatelessWidget {
           ),
 
         // 下一張（中層）
-        if (currentIndex + 1 < 3)
+        if (currentIndex + 1 < 8)
           Transform.scale(
             scale: 0.94,
             child: Opacity(
@@ -372,7 +372,7 @@ class _CardStack extends StatelessWidget {
                         ),
                         SizedBox(width: 6),
                         Text(
-                          'AI 插圖生成中…',
+                          'Gemini 貼圖生成中…',
                           style: TextStyle(
                               fontSize: 11, color: Colors.white),
                         ),
@@ -755,7 +755,7 @@ class _CompletionViewState extends State<_CompletionView>
             if (hasKept) ...[
               const SizedBox(height: 6),
               Text(
-                '累積 8 張後，可至 LINE Creators Market 上架',
+                '已儲存 LINE 貼圖，可至 LINE Creators Market 上架',
                 style: GoogleFonts.nunito(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -854,8 +854,8 @@ class _LoadingViewState extends State<_LoadingView>
   @override
   Widget build(BuildContext context) {
     final label = widget.status == EditorStatus.removingBackground
-        ? '正在去除背景…'
-        : '正在生成貼圖文字…';
+        ? '正在處理圖片…'
+        : '正在準備貼圖生成…';
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
