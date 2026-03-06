@@ -2,7 +2,9 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../models/frame_style.dart';
 import '../models/sticker_config.dart';
+import 'frame_painter.dart';
 
 /// LINE 貼圖風格畫布（支援雙指縮放 + 拖曳移位）
 ///
@@ -19,6 +21,7 @@ class StickerCanvas extends StatefulWidget {
   final Uint8List? generatedImage;
   final String text;
   final StickerConfig config;
+  final FrameStyle? frameStyle;  // null = 使用舊的矩形框
 
   static const double aspectRatio = 740 / 640;
 
@@ -28,6 +31,7 @@ class StickerCanvas extends StatefulWidget {
     this.generatedImage,
     required this.text,
     required this.config,
+    this.frameStyle,
   });
 
   @override
@@ -94,10 +98,10 @@ class _StickerCanvasState extends State<StickerCanvas> {
                   ),
                 ),
               ),
+              // ── 花型 / 自訂邊框疊在插圖上層 ─────────────────────
+              if (widget.frameStyle != null)
+                CustomPaint(painter: FramePainter(style: widget.frameStyle!)),
             ] else ...[
-              // ── 彩色粗外框 ─────────────────────────────────────────
-              _BorderFrame(color: widget.config.colorScheme.borderColor),
-
               // ── 背景裝飾（主體後方） ──────────────────────────────
               ..._buildDecorations(foreground: false),
 
@@ -106,6 +110,12 @@ class _StickerCanvasState extends State<StickerCanvas> {
 
               // ── 前景裝飾（主體前方，部分重疊） ───────────────────
               ..._buildDecorations(foreground: true),
+
+              // ── 花型 / 自訂邊框（最上層，在裝飾之上） ────────────
+              if (widget.frameStyle != null)
+                CustomPaint(painter: FramePainter(style: widget.frameStyle!))
+              else
+                _BorderFrame(color: widget.config.colorScheme.borderColor),
             ],
 
             // ── LINE 貼圖風格大字（永遠疊在最上層）──────────────────
