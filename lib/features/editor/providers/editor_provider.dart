@@ -77,6 +77,13 @@ class _EditorFamilyNotifier
     state = state.copyWith(stickerTexts: updated);
   }
 
+  /// 使用者切換第 [stickerIndex] 張貼圖的邊框樣式（kFrameStyles 中的索引）
+  void updateFrameIndex(int stickerIndex, int frameIndex) {
+    final updated = List<int>.from(state.frameIndices);
+    updated[stickerIndex] = frameIndex;
+    state = state.copyWith(frameIndices: updated);
+  }
+
   // ─── private ────────────────────────────────────────────
 
   Future<void> _fetchTexts(Uint8List imageBytes) async {
