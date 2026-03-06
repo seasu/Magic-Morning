@@ -158,22 +158,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 ),
               ),
 
-              // ── 提示文字 ──────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  '左滑跳過　右滑保留',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade400,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-
               // ── Tinder 圓形按鈕 ───────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: _TinderButtons(
                   isExporting: _isExporting,
                   onNope: _isExporting ? null : () => _cardController.reject(),
@@ -189,7 +176,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     .read(editorStateProvider(widget.imagePath).notifier)
                     .updateStickerText(_currentIndex, t),
               ),
-              const SizedBox(height: 8),
             ],
           ],
         ),
@@ -415,7 +401,7 @@ class _StickerCard extends StatelessWidget {
     );
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
+      margin: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
