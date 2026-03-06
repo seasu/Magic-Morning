@@ -88,13 +88,6 @@ class _EditorFamilyNotifier
     state = state.copyWith(stickerTexts: updated);
   }
 
-  /// 使用者切換第 [stickerIndex] 張貼圖的邊框樣式
-  void updateFrameIndex(int stickerIndex, int frameIndex) {
-    final updated = List<int>.from(state.frameIndices);
-    updated[stickerIndex] = frameIndex;
-    state = state.copyWith(frameIndices: updated);
-  }
-
   // ─── private ────────────────────────────────────────────
 
   /// 後台並行生成 8 張 AI 圓形貼圖；每張完成後立即更新對應卡片（非阻塞）

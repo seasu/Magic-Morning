@@ -12,11 +12,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/editor_state.dart';
-import '../models/frame_style.dart';
 import '../models/sticker_config.dart';
 import '../providers/editor_provider.dart';
 import '../widgets/caption_editor.dart';
-import '../widgets/frame_painter.dart';
 import '../widgets/sticker_canvas.dart';
 import '../widgets/sticker_swipe_card.dart';
 
@@ -170,14 +168,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 ),
               ),
 
-              // ── 邊框選擇器 ────────────────────────────────────────
-              _FramePickerStrip(
-                selectedIndex: state.frameIndices[_currentIndex],
-                onFrameSelected: (fi) => ref
-                    .read(editorStateProvider(widget.imagePath).notifier)
-                    .updateFrameIndex(_currentIndex, fi),
-              ),
-
               // ── 文字編輯（簡潔內嵌） ──────────────────────────────
               _InlineTextEditor(
                 text: state.stickerTexts[_currentIndex],
@@ -310,7 +300,6 @@ class _CardStack extends StatelessWidget {
                 generatedImage: state.generatedImages[currentIndex + 2],
                 text: state.stickerTexts[currentIndex + 2],
                 config: kStickerConfigs[currentIndex + 2],
-                frameStyle: kFrameStyles[state.frameIndices[currentIndex + 2]],
               ),
             ),
           ),
@@ -326,7 +315,6 @@ class _CardStack extends StatelessWidget {
                 generatedImage: state.generatedImages[currentIndex + 1],
                 text: state.stickerTexts[currentIndex + 1],
                 config: kStickerConfigs[currentIndex + 1],
-                frameStyle: kFrameStyles[state.frameIndices[currentIndex + 1]],
               ),
             ),
           ),
@@ -346,7 +334,6 @@ class _CardStack extends StatelessWidget {
                 generatedImage: state.generatedImages[currentIndex],
                 text: state.stickerTexts[currentIndex],
                 config: kStickerConfigs[currentIndex],
-                frameStyle: kFrameStyles[state.frameIndices[currentIndex]],
               ),
               // AI 插圖生成中提示（僅在尚未收到圖時顯示）
               if (state.generatedImages[currentIndex] == null)
@@ -395,7 +382,6 @@ class _StickerCard extends StatelessWidget {
   final Uint8List? generatedImage;
   final String text;
   final StickerConfig config;
-  final FrameStyle? frameStyle;
 
   const _StickerCard({
     this.repaintKey,
@@ -403,7 +389,6 @@ class _StickerCard extends StatelessWidget {
     this.generatedImage,
     required this.text,
     required this.config,
-    this.frameStyle,
   });
 
   @override
@@ -413,7 +398,6 @@ class _StickerCard extends StatelessWidget {
       generatedImage: generatedImage,
       text: text,
       config: config,
-      frameStyle: frameStyle,
     );
 
     return Container(
@@ -592,38 +576,6 @@ class _CircleButtonState extends State<_CircleButton>
                         : Colors.grey.shade400,
                   ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── 邊框選擇器橫列 ────────────────────────────────────────────────────────
-
-class _FramePickerStrip extends StatelessWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onFrameSelected;
-
-  const _FramePickerStrip({
-    required this.selectedIndex,
-    required this.onFrameSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 72,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        itemCount: kFrameStyles.length,
-        itemBuilder: (_, i) => FrameThumbnail(
-          style: kFrameStyles[i],
-          selected: i == selectedIndex,
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onFrameSelected(i);
-          },
         ),
       ),
     );
