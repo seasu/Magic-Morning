@@ -130,37 +130,43 @@ class _StickerSwipeCardState extends State<StickerSwipeCard>
     final progress = _swipeProgress;
     final angle = _offset.dx * 0.0012; // 微幅傾斜
 
-    return GestureDetector(
-      onPanUpdate: _onPanUpdate,
-      onPanEnd: _onPanEnd,
-      child: Transform(
-        transform: Matrix4.identity()
-          ..translate(_offset.dx, _offset.dy)
-          ..rotateZ(angle),
-        alignment: FractionalOffset.bottomCenter,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            widget.child,
-            // 右滑：保留徽章
-            if (progress > 0.15)
-              _SwipeBadge(
-                label: '保留',
-                icon: Icons.favorite_rounded,
-                color: Colors.green.shade400,
-                opacity: progress,
-                isLeft: true,
-              ),
-            // 左滑：跳過徽章
-            if (progress < -0.15)
-              _SwipeBadge(
-                label: '跳過',
-                icon: Icons.close_rounded,
-                color: Colors.red.shade400,
-                opacity: -progress,
-                isLeft: false,
-              ),
-          ],
+    // 用 SizedBox.expand 讓手勢區域填滿父層（Expanded）的全部空間
+    return SizedBox.expand(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque, // 空白處也觸發
+        onPanUpdate: _onPanUpdate,
+        onPanEnd: _onPanEnd,
+        child: Center(
+          child: Transform(
+            transform: Matrix4.identity()
+              ..translate(_offset.dx, _offset.dy)
+              ..rotateZ(angle),
+            alignment: FractionalOffset.bottomCenter,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                widget.child,
+                // 右滑：保留徽章
+                if (progress > 0.15)
+                  _SwipeBadge(
+                    label: '保留',
+                    icon: Icons.favorite_rounded,
+                    color: Colors.green.shade400,
+                    opacity: progress,
+                    isLeft: true,
+                  ),
+                // 左滑：跳過徽章
+                if (progress < -0.15)
+                  _SwipeBadge(
+                    label: '跳過',
+                    icon: Icons.close_rounded,
+                    color: Colors.red.shade400,
+                    opacity: -progress,
+                    isLeft: false,
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
