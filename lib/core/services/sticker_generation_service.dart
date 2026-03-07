@@ -75,24 +75,19 @@ class StickerGenerationService {
             await Future.delayed(delay);
             continue;
           }
-          return List.filled(8, null);
+          _logApiError(429, response.body, attempt);
+          throw StickerApiException(429, response.body);
         }
 
         if (response.statusCode != 200) {
-          final snippet = response.body.length > 500
-              ? response.body.substring(0, 500)
-              : response.body;
-          FirebaseService.log(
-            'StickerGenerationService: HTTP ${response.statusCode} '
-            '(attempt ${attempt + 1}) — $snippet',
-          );
+          _logApiError(response.statusCode, response.body, attempt);
           // 5xx server error → retry；4xx（除 429）→ 直接失敗
           if (response.statusCode >= 500 && attempt < maxRetries) {
             final delay = Duration(seconds: (attempt + 1) * 5);
             await Future.delayed(delay);
             continue;
           }
-          return List.filled(8, null);
+          throw StickerApiException(response.statusCode, response.body);
         }
 
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -117,8 +112,8 @@ class StickerGenerationService {
           }
         }
 
-        FirebaseService.log('StickerGenerationService: no image part in grid response');
-        return List.filled(8, null);
+        _logApiError(200, response.body, attempt, label: 'no image part');
+        throw StickerApiException(200, 'API 回傳無圖片（response body）:\n${response.body}');
 
       } catch (e, stack) {
         await FirebaseService.recordError(
@@ -190,6 +185,25 @@ class StickerGenerationService {
     return results;
   }
 
+  /// API 錯誤時：同時寫入 Crashlytics log（完整 body）供事後查閱
+  ///
+  /// Crashlytics log 上限約 64 KB；body 超過 4000 字元時截斷並標注。
+  static void _logApiError(
+    int statusCode,
+    String body,
+    int attempt, {
+    String label = '',
+  }) {
+    const maxLen = 4000;
+    final truncated = body.length > maxLen;
+    final bodySnippet =
+        truncated ? '${body.substring(0, maxLen)}…[truncated]' : body;
+    final tag = label.isNotEmpty ? ' ($label)' : '';
+    FirebaseService.log(
+      '[API ERROR] HTTP $statusCode attempt=${attempt + 1}$tag\n$bodySnippet',
+    );
+  }
+
   /// 從 Gemini 錯誤訊息解析「retry in X.Xs」秒數
   static Duration? _parseRetryDelay(String body) {
     final m = RegExp(r'retry in (\d+(?:\.\d+)?)s', caseSensitive: false)
@@ -238,4 +252,15 @@ STYLE: LINE Friends / Chiikawa quality. Each sticker must look different from th
 CRITICAL: Output ONLY the grid image. No text, no labels, no borders outside the cells.
 ''';
   }
+}
+
+/// Gemini API 呼叫失敗時拋出，攜帶完整錯誤資訊供 UI 顯示
+class StickerApiException implements Exception {
+  final int statusCode;
+  final String body;
+
+  const StickerApiException(this.statusCode, this.body);
+
+  @override
+  String toString() => 'StickerApiException HTTP $statusCode:\n$body';
 }
