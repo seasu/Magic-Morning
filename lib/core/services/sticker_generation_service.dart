@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -129,24 +130,29 @@ class StickerGenerationService {
 
   // ─── private ────────────────────────────────────────────────────────────
 
-  /// grid 圖裁切：將大圖均分為 cols×rows 個格子，回傳 PNG bytes list
+  /// grid 圖裁切：將大圖均分為 cols×rows 個格子，回傳正方形 PNG bytes list
+  ///
+  /// 每格輸出為正方形（邊長 = max(cellW, cellH)），內容置中、白底 padding。
+  /// 這樣無論 Gemini 回傳 1024×1024（每格扁）或 1024×8192（每格方）都能正確顯示。
   /// 順序：左→右、上→下（與 prompt 編號一致）
   Future<List<Uint8List?>> _cropGrid(
     Uint8List imageBytes, {
     required int cols,
     required int rows,
   }) async {
-    // 解碼完整圖片
     final codec = await ui.instantiateImageCodec(imageBytes);
     final frame = await codec.getNextFrame();
     final fullImage = frame.image;
 
     final cellW = fullImage.width ~/ cols;
     final cellH = fullImage.height ~/ rows;
+    // 輸出為正方形，避免 Gemini 回傳非 1:N 長寬比時格子扭曲
+    final cellSize = math.max(cellW, cellH);
 
     FirebaseService.log(
       'StickerGenerationService._cropGrid: '
-      '${fullImage.width}×${fullImage.height} → ${cellW}×$cellH per cell',
+      '${fullImage.width}×${fullImage.height} → ${cellW}×$cellH per cell, '
+      'output ${cellSize}×$cellSize (square)',
     );
 
     final results = <Uint8List?>[];
@@ -157,6 +163,15 @@ class StickerGenerationService {
           final recorder = ui.PictureRecorder();
           final canvas = ui.Canvas(recorder);
 
+          // 白底
+          canvas.drawRect(
+            Rect.fromLTWH(0, 0, cellSize.toDouble(), cellSize.toDouble()),
+            ui.Paint()..color = const ui.Color(0xFFFFFFFF),
+          );
+
+          // 內容置中（若 cellH < cellSize，則在正方形中垂直置中）
+          final dstX = ((cellSize - cellW) / 2.0);
+          final dstY = ((cellSize - cellH) / 2.0);
           canvas.drawImageRect(
             fullImage,
             Rect.fromLTWH(
@@ -165,12 +180,12 @@ class StickerGenerationService {
               cellW.toDouble(),
               cellH.toDouble(),
             ),
-            Rect.fromLTWH(0, 0, cellW.toDouble(), cellH.toDouble()),
+            Rect.fromLTWH(dstX, dstY, cellW.toDouble(), cellH.toDouble()),
             ui.Paint(),
           );
 
           final picture = recorder.endRecording();
-          final cropped = await picture.toImage(cellW, cellH);
+          final cropped = await picture.toImage(cellSize, cellSize);
           final byteData =
               await cropped.toByteData(format: ui.ImageByteFormat.png);
           results.add(byteData?.buffer.asUint8List());

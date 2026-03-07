@@ -95,7 +95,7 @@ class _StickerCanvasState extends State<StickerCanvas> {
                 scale: _scale,
                 child: Image.memory(
                   widget.generatedImage!,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.contain,
                   width: double.infinity,
                   height: double.infinity,
                   filterQuality: FilterQuality.high,
