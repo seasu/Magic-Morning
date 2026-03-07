@@ -112,22 +112,14 @@ class _StickerCanvasState extends State<StickerCanvas> {
     );
   }
 
-  /// 生成中 fallback（AI 圖尚未到達）：顯示文字泡泡作為佔位
+  /// 生成中 fallback（AI 圖尚未到達）：純色背景，不顯示文字
+  /// 載入中的 badge 由外層 _CardStack 疊加，此處保持乾淨
   Widget _buildFallback() {
     final color = widget.config.colorScheme.borderColor;
     return Container(
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _OutlinedStickerText(
-            text: widget.text,
-            config: widget.config,
-          ),
-        ),
       ),
     );
   }

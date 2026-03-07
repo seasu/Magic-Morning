@@ -9,9 +9,10 @@ import 'package:http/http.dart' as http;
 import '../models/sticker_spec.dart';
 import 'firebase_service.dart';
 
-/// Gemini 2.0 Flash Image Generation 貼圖生成服務
+/// Gemini 貼圖生成服務
 ///
-/// 一次 API 呼叫生成 2×4 grid 圖（共 8 張貼圖），收到後裁切回傳 8 張。
+/// 一次 API 呼叫生成 1×8 直欄圖（共 8 張貼圖，垂直堆疊），
+/// 收到後沿水平線均切 8 份，裁切最可靠（無欄位對齊問題）。
 /// 只消耗 1 個 API 請求，大幅降低 rate-limit 壓力。
 ///
 /// 注意：需在 dart-define 設定 GEMINI_API_KEY
@@ -22,9 +23,9 @@ class StickerGenerationService {
       'https://generativelanguage.googleapis.com/v1beta'
       '/models/gemini-2.5-flash-image:generateContent';
 
-  /// 一次呼叫生成 8 張貼圖（2 欄 × 4 列 grid），裁切後回傳 List<Uint8List?>
+  /// 一次呼叫生成 8 張貼圖（1 欄 × 8 列，垂直堆疊），裁切後回傳 List<Uint8List?>
   ///
-  /// 回傳長度固定為 8，對應索引 0–7。
+  /// 回傳長度固定為 8，對應索引 0–7（上→下）。
   /// 失敗時對應位置為 null。
   Future<List<Uint8List?>> generateAllAsGrid(
     Uint8List photoBytes,
@@ -104,7 +105,7 @@ class StickerGenerationService {
                 'StickerGenerationService: grid received '
                 '(${gridBytes.lengthInBytes} bytes), cropping…',
               );
-              final crops = await _cropGrid(gridBytes, cols: 2, rows: 4);
+              final crops = await _cropGrid(gridBytes, cols: 1, rows: 8);
               await FirebaseAnalytics.instance
                   .logEvent(name: 'sticker_images_generated');
               return crops;
@@ -214,42 +215,39 @@ class StickerGenerationService {
     return Duration(milliseconds: ((seconds + 1) * 1000).round());
   }
 
-  /// 建立 2×4 grid prompt，明確編號每個格子的貼圖規格
+  /// 建立 1×8 垂直堆疊 prompt（單欄，水平切割最可靠）
   String _buildGridPrompt(List<StickerSpec> specs) {
     final cells = List.generate(8, (i) {
       final s = specs[i];
-      final row = i ~/ 2 + 1;
-      final col = i % 2 + 1;
-      return 'Cell ${i + 1} (row $row, col $col): '
-          'background=${s.bgColor}, expression=${s.emotion}, '
-          'Chinese text="${s.text}"';
+      return 'Row ${i + 1}: background=${s.bgColor}, '
+          'expression=${s.emotion}, Chinese text="${s.text}"';
     }).join('\n');
 
     return '''
-You are a professional LINE sticker illustrator. Create a single image containing a 2-column × 4-row grid of 8 circular LINE stickers based on the person's face in the photo.
+You are a professional LINE sticker illustrator. Create a single tall image containing 8 circular LINE stickers stacked vertically (1 column × 8 rows) based on the person's face in the photo.
 
-GRID LAYOUT:
-- 2 columns, 4 rows = 8 cells total
-- Cells are arranged left-to-right, top-to-bottom (cell 1 = top-left, cell 2 = top-right, cell 3 = row2-left, …, cell 8 = bottom-right)
-- Each cell is EXACTLY equal in size. NO borders, labels, numbers, or gaps between cells — pure seamless white space only at outer edges
-- Total canvas: white background
+LAYOUT:
+- 1 column, 8 rows = 8 cells total, stacked top-to-bottom
+- Each cell is a PERFECT SQUARE of identical size
+- NO gaps, borders, numbers, or labels between rows
+- NO padding at top or bottom — cells fill the entire canvas edge-to-edge
+- White background outside each circle
 
 EACH CELL DESIGN:
-- A large filled circle (occupying ~90% of the cell) centered in the cell
-- Pure white outside the circle
-- Cartoon chibi face of the person in the photo (cute, simplified, Q-version)
+- A large filled circle occupying ~90% of the cell, centered
+- Cartoon chibi face of the person in the photo (cute, Q-version)
   * Big sparkly eyes, small nose, chubby cheeks
   * Face fills ~65% of the circle (upper portion)
-  * Clean flat illustration, thick outlines, no photo-realism
-- Chinese text in bold rounded font, bottom 25% inside the circle, white with shadow
+  * Clean flat illustration, thick black outlines, no photo-realism
+- Chinese text in bold rounded font at bottom 25% inside the circle, white fill with dark shadow
 - 3–5 small sparkles/stars/themed icons scattered inside the circle
-- White outline (4px) around each circle
+- White outline (4 px) around each circle
 
-CELL SPECIFICATIONS (left→right, top→bottom):
+ROW SPECIFICATIONS (top to bottom):
 $cells
 
-STYLE: LINE Friends / Chiikawa quality. Each sticker must look different from the others.
-CRITICAL: Output ONLY the grid image. No text, no labels, no borders outside the cells.
+STYLE: LINE Friends / Chiikawa quality. Each sticker must look different.
+CRITICAL: Output ONLY this 1×8 stacked image. No text, no labels, no extra borders.
 ''';
   }
 }
