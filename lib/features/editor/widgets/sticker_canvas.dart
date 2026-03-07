@@ -78,25 +78,42 @@ class _StickerCanvasState extends State<StickerCanvas> {
   bool get _hasFailed =>
       widget.generatedImage != null && widget.generatedImage!.isEmpty;
 
-  /// AI 圖直接全幅顯示，可縮放拖曳，零 Flutter 疊加
+  /// AI 圖全幅顯示 + Flutter 文字 overlay（底部 22% 高度）
+  /// 文字由 Flutter 渲染，避免 Gemini 中文字亂字問題
   Widget _buildAiImage() {
     return ClipRect(
-      child: GestureDetector(
-        onScaleStart: _onScaleStart,
-        onScaleUpdate: _onScaleUpdate,
-        child: Transform.translate(
-          offset: _offset,
-          child: Transform.scale(
-            scale: _scale,
-            child: Image.memory(
-              widget.generatedImage!,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              filterQuality: FilterQuality.high,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // AI 插圖（可縮放拖曳）
+          GestureDetector(
+            onScaleStart: _onScaleStart,
+            onScaleUpdate: _onScaleUpdate,
+            child: Transform.translate(
+              offset: _offset,
+              child: Transform.scale(
+                scale: _scale,
+                child: Image.memory(
+                  widget.generatedImage!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
             ),
           ),
-        ),
+          // 文字 overlay（底部對齊，Flutter 負責渲染）
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 14,
+            child: _OutlinedStickerText(
+              text: widget.text,
+              config: widget.config,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -112,22 +129,14 @@ class _StickerCanvasState extends State<StickerCanvas> {
     );
   }
 
-  /// 生成中 fallback（AI 圖尚未到達）：顯示文字泡泡作為佔位
+  /// 生成中 fallback（AI 圖尚未到達）：純色背景，不顯示文字
+  /// 載入中的 badge 由外層 _CardStack 疊加，此處保持乾淨
   Widget _buildFallback() {
     final color = widget.config.colorScheme.borderColor;
     return Container(
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _OutlinedStickerText(
-            text: widget.text,
-            config: widget.config,
-          ),
-        ),
       ),
     );
   }
