@@ -77,6 +77,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         );
       }
 
+      // 儲存前確保 runtime 權限已授予（Android 13+ READ_MEDIA_IMAGES）
+      if (!await Gal.hasAccess()) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          throw const GalException(type: GalExceptionType.accessDenied);
+        }
+      }
+
       await Gal.putImageBytes(bytes);
       await FirebaseAnalytics.instance.logEvent(name: 'sticker_generated');
       setState(() {
@@ -84,6 +92,17 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         _isExporting = false;
         _currentIndex++;
       });
+    } on GalException catch (e, stack) {
+      await FirebaseService.recordError(e, stack,
+          reason: 'editor_export_failed');
+      setState(() => _isExporting = false);
+      if (!mounted) return;
+      final msg = switch (e.type) {
+        GalExceptionType.accessDenied => '請至設定開啟相簿存取權限',
+        GalExceptionType.notEnoughSpace => '儲存空間不足，請清理後重試',
+        _ => '儲存失敗，請重試',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack,
           reason: 'editor_export_failed');
