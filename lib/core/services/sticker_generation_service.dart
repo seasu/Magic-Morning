@@ -35,6 +35,9 @@ class StickerGenerationService {
   }
 
   /// 生成單張貼圖，規格由 AI 自由決定的 [spec] 提供
+  ///
+  /// 自動重試：HTTP 429 / quota 錯誤時解析 "retry in Xs"，最多重試 3 次。
+  /// [index] 用於初始 stagger delay（避免 8 張同時打爆 rate limit）。
   Future<Uint8List?> generateOne(
     Uint8List photoBytes,
     StickerSpec spec,
@@ -42,70 +45,111 @@ class StickerGenerationService {
   ) async {
     FirebaseService.log(
         'StickerGenerationService.generateOne: #$index "${spec.text}"');
-    try {
-      final body = jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {'text': _buildPrompt(spec)},
-              {
-                'inlineData': {
-                  'mimeType': 'image/jpeg',
-                  'data': base64Encode(photoBytes),
-                }
-              },
-            ],
+
+    // 分批錯開：每張間隔 300ms，避免 8 張同時觸發 rate limit
+    if (index > 0) {
+      await Future.delayed(Duration(milliseconds: index * 300));
+    }
+
+    const maxRetries = 3;
+
+    for (int attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        final body = jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {'text': _buildPrompt(spec)},
+                {
+                  'inlineData': {
+                    'mimeType': 'image/jpeg',
+                    'data': base64Encode(photoBytes),
+                  }
+                },
+              ],
+            }
+          ],
+          'generationConfig': {
+            'responseModalities': ['IMAGE', 'TEXT'],
+          },
+        });
+
+        final response = await http
+            .post(
+              Uri.parse('$_endpoint?key=$_apiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: body,
+            )
+            .timeout(const Duration(seconds: 30));
+
+        // Rate limit → 解析 retry 秒數並等待
+        if (response.statusCode == 429) {
+          if (attempt < maxRetries) {
+            final delay = _parseRetryDelay(response.body) ??
+                Duration(seconds: (attempt + 1) * 12);
+            FirebaseService.log(
+              'StickerGenerationService: #$index rate-limited, '
+              'retry ${attempt + 1}/$maxRetries in ${delay.inSeconds}s',
+            );
+            await Future.delayed(delay);
+            continue;
           }
-        ],
-        'generationConfig': {
-          'responseModalities': ['IMAGE', 'TEXT'],
-        },
-      });
+          FirebaseService.log(
+            'StickerGenerationService: #$index exceeded max retries (429)',
+          );
+          return null;
+        }
 
-      final response = await http
-          .post(
-            Uri.parse('$_endpoint?key=$_apiKey'),
-            headers: {'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 30));
+        if (response.statusCode != 200) {
+          FirebaseService.log(
+            'StickerGenerationService: HTTP ${response.statusCode} '
+            'for #$index — ${response.body.substring(0, 200)}',
+          );
+          return null;
+        }
 
-      if (response.statusCode != 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final parts =
+            json['candidates'][0]['content']['parts'] as List<dynamic>;
+
+        for (final part in parts) {
+          if (part is Map<String, dynamic> &&
+              part.containsKey('inlineData')) {
+            final mimeType = part['inlineData']['mimeType'] as String;
+            if (mimeType.startsWith('image/')) {
+              final bytes =
+                  base64Decode(part['inlineData']['data'] as String);
+              FirebaseService.log(
+                  'StickerGenerationService: #$index done '
+                  '(${bytes.lengthInBytes} bytes)');
+              return bytes;
+            }
+          }
+        }
+
         FirebaseService.log(
-          'StickerGenerationService: HTTP ${response.statusCode} '
-          'for #$index — ${response.body.substring(0, 200)}',
+            'StickerGenerationService: no image part for #$index');
+        return null;
+
+      } catch (e, stack) {
+        await FirebaseService.recordError(
+          e, stack, reason: 'sticker_image_gen_failed',
         );
         return null;
       }
-
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final parts =
-          json['candidates'][0]['content']['parts'] as List<dynamic>;
-
-      for (final part in parts) {
-        if (part is Map<String, dynamic> &&
-            part.containsKey('inlineData')) {
-          final mimeType = part['inlineData']['mimeType'] as String;
-          if (mimeType.startsWith('image/')) {
-            final bytes =
-                base64Decode(part['inlineData']['data'] as String);
-            FirebaseService.log(
-                'StickerGenerationService: #$index done '
-                '(${bytes.lengthInBytes} bytes)');
-            return bytes;
-          }
-        }
-      }
-
-      FirebaseService.log(
-          'StickerGenerationService: no image part for #$index');
-      return null;
-    } catch (e, stack) {
-      await FirebaseService.recordError(
-        e, stack, reason: 'sticker_image_gen_failed',
-      );
-      return null;
     }
+
+    return null;
+  }
+
+  /// 從 Gemini 錯誤訊息解析「retry in X.Xs」秒數
+  static Duration? _parseRetryDelay(String body) {
+    final m = RegExp(r'retry in (\d+(?:\.\d+)?)s', caseSensitive: false)
+        .firstMatch(body);
+    if (m == null) return null;
+    final seconds = double.tryParse(m.group(1)!);
+    if (seconds == null) return null;
+    return Duration(milliseconds: ((seconds + 1) * 1000).round());
   }
 
   /// 根據 AI 自由規格建立 Gemini 圖片生成 prompt
