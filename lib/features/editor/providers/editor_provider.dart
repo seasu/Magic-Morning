@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/sticker_spec.dart';
+import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/gemini_service.dart';
 import '../../../core/services/sticker_generation_service.dart';
@@ -86,6 +87,23 @@ class _EditorFamilyNotifier
     state = state.copyWith(colorSchemeIndices: updated);
   }
 
+  /// 使用者在編輯 popup 選擇字型
+  void updateFontIndex(int stickerIdx, int fontIdx) {
+    final updated = List<int>.from(state.fontIndices);
+    updated[stickerIdx] = fontIdx;
+    state = state.copyWith(fontIndices: updated);
+  }
+
+  /// 使用者在編輯 popup 選擇產圖風格
+  ///
+  /// 風格直接影響 Gemini prompt，選完後立即重新生成該張圖片。
+  Future<void> updateStyleIndex(int stickerIdx, int styleIdx) async {
+    final updated = List<int>.from(state.styleIndices);
+    updated[stickerIdx] = styleIdx;
+    state = state.copyWith(styleIndices: updated);
+    await retryImageGeneration(stickerIdx);
+  }
+
   /// 使用者在編輯 popup 縮放/位移圖片
   void updateImageTransform(int stickerIdx, double scale, Offset offset) {
     final scales = List<double>.from(state.imageScales);
@@ -108,8 +126,12 @@ class _EditorFamilyNotifier
     try {
       final resized = await ImageProcessor.resizeForNative(
           File(state.originalImagePath));
-      final bytes = await StickerGenerationService()
-          .generateSingle(resized, _specs![index], index: index);
+      final bytes = await StickerGenerationService().generateSingle(
+        resized,
+        _specs![index],
+        index: index,
+        styleIndex: state.styleIndices[index],
+      );
       final updated = List<Uint8List?>.from(state.generatedImages);
       final errors = List<String?>.from(state.imageErrors);
       updated[index] = bytes ?? Uint8List(0);
@@ -139,8 +161,12 @@ class _EditorFamilyNotifier
     final service = StickerGenerationService();
     for (int i = 0; i < specs.length; i++) {
       try {
-        final bytes =
-            await service.generateSingle(photoBytes, specs[i], index: i);
+        final bytes = await service.generateSingle(
+          photoBytes,
+          specs[i],
+          index: i,
+          styleIndex: state.styleIndices[i],
+        );
         final updated = List<Uint8List?>.from(state.generatedImages);
         final errors = List<String?>.from(state.imageErrors);
         updated[i] = bytes ?? Uint8List(0);

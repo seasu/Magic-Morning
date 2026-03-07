@@ -137,12 +137,16 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         initialSchemeIndex: state.colorSchemeIndices[idx],
         initialScale: state.imageScales[idx],
         initialOffset: state.imageOffsets[idx],
+        initialFontIndex: state.fontIndices[idx],
+        initialStyleIndex: state.styleIndices[idx],
         subjectBytes: state.subjectBytes,
         generatedImage: state.generatedImages[idx],
         onTextChanged: (text) => notifier.updateStickerText(idx, text),
         onSchemeChanged: (si) => notifier.updateColorSchemeIndex(idx, si),
         onTransformChanged: (s, o) =>
             notifier.updateImageTransform(idx, s, o),
+        onFontChanged: (fi) => notifier.updateFontIndex(idx, fi),
+        onStyleChanged: (si) => notifier.updateStyleIndex(idx, si),
       ),
     );
   }
@@ -349,6 +353,7 @@ class _CardStack extends StatelessWidget {
                     state.colorSchemeIndices[currentIndex + 2]],
                 initialScale: state.imageScales[currentIndex + 2],
                 initialOffset: state.imageOffsets[currentIndex + 2],
+                fontIndex: state.fontIndices[currentIndex + 2],
               ),
             ),
           ),
@@ -367,6 +372,7 @@ class _CardStack extends StatelessWidget {
                     state.colorSchemeIndices[currentIndex + 1]],
                 initialScale: state.imageScales[currentIndex + 1],
                 initialOffset: state.imageOffsets[currentIndex + 1],
+                fontIndex: state.fontIndices[currentIndex + 1],
               ),
             ),
           ),
@@ -388,6 +394,7 @@ class _CardStack extends StatelessWidget {
                 config: kStickerConfigs[state.colorSchemeIndices[currentIndex]],
                 initialScale: state.imageScales[currentIndex],
                 initialOffset: state.imageOffsets[currentIndex],
+                fontIndex: state.fontIndices[currentIndex],
                 onTap: onEdit,
               ),
               // ── 生成中 badge ──────────────────────────────────────
@@ -423,6 +430,7 @@ class _StickerCard extends StatelessWidget {
   final StickerConfig config;
   final double initialScale;
   final Offset initialOffset;
+  final int fontIndex;
   final VoidCallback? onTap;
 
   const _StickerCard({
@@ -433,6 +441,7 @@ class _StickerCard extends StatelessWidget {
     required this.config,
     this.initialScale = 1.0,
     this.initialOffset = Offset.zero,
+    this.fontIndex = 0,
     this.onTap,
   });
 
@@ -445,6 +454,7 @@ class _StickerCard extends StatelessWidget {
       config: config,
       initialScale: initialScale,
       initialOffset: initialOffset,
+      fontIndex: fontIndex,
       onTap: onTap,
     );
 
