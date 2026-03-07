@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'dart:math' show pi, sin;
 import 'dart:ui' as ui;
 
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
@@ -181,7 +184,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             ),
 
             if (isLoading)
-              Expanded(child: _LoadingView(status: state.status))
+              const Expanded(child: _FunLoadingView())
             else if (state.errorMessage != null)
               Expanded(child: _ErrorView(message: state.errorMessage!))
             else if (isDone)
@@ -899,121 +902,200 @@ class _CompletionViewState extends State<_CompletionView>
   }
 }
 
-// ─── Loading（Shimmer 骨架）/ Error ───────────────────────────────────────
+// ─── 趣味 Loading（貓追老鼠動畫）/ Error ────────────────────────────────
 
-class _LoadingView extends StatefulWidget {
-  final EditorStatus status;
-
-  const _LoadingView({required this.status});
+/// 取代枯燥 shimmer 的趣味等待動畫：🐱 貓追 🐭 老鼠
+class _FunLoadingView extends StatefulWidget {
+  const _FunLoadingView();
 
   @override
-  State<_LoadingView> createState() => _LoadingViewState();
+  State<_FunLoadingView> createState() => _FunLoadingViewState();
 }
 
-class _LoadingViewState extends State<_LoadingView>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _shimmerCtrl;
+class _FunLoadingViewState extends State<_FunLoadingView>
+    with TickerProviderStateMixin {
+  late final AnimationController _chaseCtrl;   // 橫向追逐進度
+  late final AnimationController _bounceCtrl;  // 上下彈跳
+  int _msgIndex = 0;
+  Timer? _msgTimer;
+
+  static const _messages = [
+    '🐱 AI 貓咪正在捕捉靈感…',
+    '🐭 老鼠偷走了你的臉，快追！',
+    '✨ 施展魔法中，請稍等…',
+    '🎨 努力作畫中，快好了！',
+    '💨 再一下下，跑不掉的！',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _shimmerCtrl = AnimationController(
+    _chaseCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 4500),
     )..repeat();
+    _bounceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    )..repeat(reverse: true);
+    _msgTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      if (mounted) setState(() => _msgIndex = (_msgIndex + 1) % _messages.length);
+    });
   }
 
   @override
   void dispose() {
-    _shimmerCtrl.dispose();
+    _chaseCtrl.dispose();
+    _bounceCtrl.dispose();
+    _msgTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final label = widget.status == EditorStatus.removingBackground
-        ? '正在處理圖片…'
-        : '正在準備貼圖生成…';
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Shimmer 骨架卡（與正式卡尺寸一致）
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: AspectRatio(
-            aspectRatio: 740 / 640,
-            child: AnimatedBuilder(
-              animation: _shimmerCtrl,
-              builder: (_, __) {
-                final x = -1.0 + 3.0 * _shimmerCtrl.value;
-                return Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      begin: Alignment(x - 1, 0),
-                      end: Alignment(x + 1, 0),
-                      colors: const [
-                        Color(0xFFEEEEEE),
-                        Color(0xFFF6F6F6),
-                        Color(0xFFEEEEEE),
-                      ],
-                    ),
-                  ),
-                );
-              },
+        _ChaseStage(chaseCtrl: _chaseCtrl, bounceCtrl: _bounceCtrl),
+        const SizedBox(height: 36),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.25),
+                end: Offset.zero,
+              ).animate(anim),
+              child: child,
+            ),
+          ),
+          child: Text(
+            _messages[_msgIndex],
+            key: ValueKey(_msgIndex),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.notoSansTc(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        // 狀態文字 + 小 dots 動畫
-        _ShimmerLabel(label: label, controller: _shimmerCtrl),
       ],
     );
   }
 }
 
-/// 狀態文字旁的三個小光點（複用 shimmer controller）
-class _ShimmerLabel extends StatelessWidget {
-  final String label;
-  final AnimationController controller;
+/// 舞台：🐭 老鼠在前、🐱 貓在後追趕，搭配尾跡小星星
+class _ChaseStage extends StatelessWidget {
+  final AnimationController chaseCtrl;
+  final AnimationController bounceCtrl;
 
-  const _ShimmerLabel({required this.label, required this.controller});
+  const _ChaseStage({required this.chaseCtrl, required this.bounceCtrl});
+
+  static const _stageHeight = 160.0;
+  static const _floor = 110.0;        // 角色底部距舞台頂的距離
+  static const _catSize = 52.0;
+  static const _mouseSize = 46.0;
+  static const _gap = 88.0;           // 預設貓鼠水平間距
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.notoSansTc(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(width: 6),
-        ...List.generate(3, (i) {
-          return AnimatedBuilder(
-            animation: controller,
-            builder: (_, __) {
-              final phase = ((controller.value - i * 0.15) % 1.0).clamp(0.0, 1.0);
-              final opacity = (0.3 + 0.7 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2))
-                  .clamp(0.0, 1.0);
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                width: 5,
-                height: 5,
+    return LayoutBuilder(builder: (ctx, constraints) {
+      final stageW = constraints.maxWidth;
+      final travelW = stageW - _catSize - 24; // 可移動寬度
+
+      return SizedBox(
+        height: _stageHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // ── 地板線 ────────────────────────────────────────────────
+            Positioned(
+              bottom: _stageHeight - _floor - 2,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 2,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.textSecondary.withOpacity(opacity),
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      Colors.grey.shade300,
+                      Colors.grey.shade300,
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
-              );
-            },
-          );
-        }),
-      ],
-    );
+              ),
+            ),
+
+            // ── 角色（貓 + 老鼠 + 尾跡星星）─────────────────────────
+            AnimatedBuilder(
+              animation: Listenable.merge([chaseCtrl, bounceCtrl]),
+              builder: (_, __) {
+                final t = chaseCtrl.value;   // 0→1 追逐進度
+                final b = bounceCtrl.value;  // 0→1→0 彈跳
+
+                // 追逐結尾讓貓加速靠近老鼠（sin 曲線讓間距縮小）
+                final catProgress = t;
+                final mouseProgress = (t + 0.18).clamp(0.0, 1.0);
+
+                final catX = travelW * catProgress;
+                final mouseX = (travelW * mouseProgress + _gap).clamp(0.0, stageW - _mouseSize);
+
+                final catBounce = -10.0 * sin(b * pi);
+                final mouseBounce = -13.0 * sin((b + 0.2) * pi);
+
+                // 星星尾跡透明度（老鼠後方）
+                final sparkOpacity = (sin(t * pi * 8) * 0.5 + 0.5).clamp(0.0, 1.0);
+
+                final baseY = _floor - _catSize;
+
+                return Stack(
+                  children: [
+                    // ✨ 尾跡星星 1
+                    Positioned(
+                      left: mouseX - 14,
+                      top: baseY + mouseBounce + 4,
+                      child: Opacity(
+                        opacity: sparkOpacity * 0.8,
+                        child: const Text('✨', style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    // ✨ 尾跡星星 2
+                    Positioned(
+                      left: mouseX - 28,
+                      top: baseY + mouseBounce + 14,
+                      child: Opacity(
+                        opacity: (1 - sparkOpacity) * 0.6,
+                        child: const Text('⭐', style: TextStyle(fontSize: 10)),
+                      ),
+                    ),
+                    // 🐭 老鼠
+                    Positioned(
+                      left: mouseX,
+                      top: baseY + mouseBounce,
+                      child: Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()..scale(-1.0, 1.0), // 面朝右（逃跑方向）
+                        child: const Text('🐭', style: TextStyle(fontSize: 40)),
+                      ),
+                    ),
+                    // 🐱 貓
+                    Positioned(
+                      left: catX,
+                      top: baseY + catBounce,
+                      child: const Text('🐱', style: TextStyle(fontSize: 46)),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    });
   }
 }
 
