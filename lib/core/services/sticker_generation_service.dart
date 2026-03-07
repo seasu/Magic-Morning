@@ -215,12 +215,13 @@ class StickerGenerationService {
     return Duration(milliseconds: ((seconds + 1) * 1000).round());
   }
 
-  /// 建立 1×8 垂直堆疊 prompt（單欄，水平切割最可靠）
+  /// 建立 1×8 垂直堆疊 prompt
+  /// 注意：不要求 AI 畫文字，文字由 Flutter 端 overlay 渲染，避免 AI 中文亂字
   String _buildGridPrompt(List<StickerSpec> specs) {
     final cells = List.generate(8, (i) {
       final s = specs[i];
-      return 'Row ${i + 1}: background=${s.bgColor}, '
-          'expression=${s.emotion}, Chinese text="${s.text}"';
+      return 'Row ${i + 1}: circle background color=${s.bgColor}, '
+          'character expression=${s.emotion}';
     }).join('\n');
 
     return '''
@@ -237,10 +238,10 @@ EACH CELL DESIGN:
 - A large filled circle occupying ~90% of the cell, centered
 - Cartoon chibi face of the person in the photo (cute, Q-version)
   * Big sparkly eyes, small nose, chubby cheeks
-  * Face fills ~65% of the circle (upper portion)
+  * Face fills ~80% of the circle (leave bottom 20% empty for text overlay)
   * Clean flat illustration, thick black outlines, no photo-realism
-- Chinese text in bold rounded font at bottom 25% inside the circle, white fill with dark shadow
-- 3–5 small sparkles/stars/themed icons scattered inside the circle
+- DO NOT draw any text inside the circle (text will be added programmatically)
+- 3–5 small sparkles/stars/themed icons scattered inside the circle (top area only)
 - White outline (4 px) around each circle
 
 ROW SPECIFICATIONS (top to bottom):
