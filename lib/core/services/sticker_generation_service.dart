@@ -9,7 +9,7 @@ import 'package:http/http.dart' as http;
 import '../models/sticker_spec.dart';
 import 'firebase_service.dart';
 
-/// Gemini 2.0 Flash 圖片生成服務
+/// Gemini 2.0 Flash Image Generation 貼圖生成服務
 ///
 /// 一次 API 呼叫生成 2×4 grid 圖（共 8 張貼圖），收到後裁切回傳 8 張。
 /// 只消耗 1 個 API 請求，大幅降低 rate-limit 壓力。
@@ -20,7 +20,7 @@ class StickerGenerationService {
 
   static const _endpoint =
       'https://generativelanguage.googleapis.com/v1beta'
-      '/models/gemini-2.0-flash:generateContent';
+      '/models/gemini-2.0-flash-preview-image-generation:generateContent';
 
   /// 一次呼叫生成 8 張貼圖（2 欄 × 4 列 grid），裁切後回傳 List<Uint8List?>
   ///
