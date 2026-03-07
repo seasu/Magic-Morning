@@ -19,8 +19,8 @@ class StickerGenerationService {
   static const _apiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   static const _endpoint =
-      'https://generativelanguage.googleapis.com/v1alpha'
-      '/models/gemini-2.0-flash-preview-image-generation:generateContent';
+      'https://generativelanguage.googleapis.com/v1beta'
+      '/models/gemini-2.5-flash-image:generateContent';
 
   /// 一次呼叫生成 8 張貼圖（2 欄 × 4 列 grid），裁切後回傳 List<Uint8List?>
   ///
