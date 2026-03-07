@@ -155,6 +155,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   cardController: _cardController,
                   onAccepted: _accept,
                   onRejected: _reject,
+                  onRetry: () => ref
+                      .read(editorStateProvider(widget.imagePath).notifier)
+                      .retryImageGeneration(_currentIndex),
                 ),
               ),
 
@@ -274,6 +277,7 @@ class _CardStack extends StatelessWidget {
   final StickerSwipeCardController cardController;
   final VoidCallback onAccepted;
   final VoidCallback onRejected;
+  final VoidCallback? onRetry;
 
   const _CardStack({
     required this.state,
@@ -282,6 +286,7 @@ class _CardStack extends StatelessWidget {
     required this.cardController,
     required this.onAccepted,
     required this.onRejected,
+    this.onRetry,
   });
 
   @override
@@ -335,37 +340,18 @@ class _CardStack extends StatelessWidget {
                 text: state.stickerTexts[currentIndex],
                 config: kStickerConfigs[currentIndex],
               ),
-              // AI 插圖生成中提示（僅在尚未收到圖時顯示）
+              // ── 生成中 badge ──────────────────────────────────────
               if (state.generatedImages[currentIndex] == null)
                 Positioned(
                   top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 10,
-                          height: 10,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Gemini 貼圖生成中…',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: _StatusBadge.loading(),
+                ),
+
+              // ── 生成失敗 badge + 重試按鈕 ─────────────────────────
+              if (state.generatedImages[currentIndex]?.isEmpty == true)
+                Positioned(
+                  top: 8,
+                  child: _StatusBadge.failed(onRetry: onRetry),
                 ),
             ],
           ),
@@ -421,6 +407,78 @@ class _StickerCard extends StatelessWidget {
       child: repaintKey != null
           ? RepaintBoundary(key: repaintKey, child: canvas)
           : canvas,
+    );
+  }
+}
+
+// ─── AI 狀態 Badge（生成中 / 失敗+重試）────────────────────────────────────
+
+class _StatusBadge extends StatelessWidget {
+  final bool isFailed;
+  final VoidCallback? onRetry;
+
+  const _StatusBadge.loading()
+      : isFailed = false,
+        onRetry = null;
+
+  const _StatusBadge.failed({this.onRetry}) : isFailed = true;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isFailed) {
+      return GestureDetector(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          onRetry?.call();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.red.shade600,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.red.withOpacity(0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 13, color: Colors.white),
+              SizedBox(width: 5),
+              Text(
+                'AI 生成失敗，點此重試',
+                style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(width: 5),
+              Icon(Icons.refresh, size: 13, color: Colors.white),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black54,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
+          ),
+          SizedBox(width: 6),
+          Text('Gemini 貼圖生成中…', style: TextStyle(fontSize: 11, color: Colors.white)),
+        ],
+      ),
     );
   }
 }
