@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/sticker_spec.dart';
-import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/gemini_service.dart';
 import '../../../core/services/sticker_generation_service.dart';

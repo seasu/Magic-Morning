@@ -83,7 +83,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       if (!await Gal.hasAccess()) {
         final granted = await Gal.requestAccess();
         if (!granted) {
-          throw const GalException(type: GalExceptionType.accessDenied);
+          throw GalException(
+            type: GalExceptionType.accessDenied,
+            error: Exception('Storage access denied'),
+            stackTrace: StackTrace.current,
+          );
         }
       }
 
