@@ -88,6 +88,34 @@ class _EditorFamilyNotifier
     state = state.copyWith(stickerTexts: updated);
   }
 
+  /// 重新生成指定索引的 AI 貼圖（單張重試）
+  Future<void> retryImageGeneration(int index) async {
+    if (_specs == null || index >= _specs!.length) return;
+
+    // 重設為 null（loading 狀態）
+    final reset = List<Uint8List?>.from(state.generatedImages);
+    reset[index] = null;
+    state = state.copyWith(generatedImages: reset);
+
+    try {
+      final resized = await ImageProcessor.resizeForNative(
+        File(state.originalImagePath),
+      );
+      final img = await StickerGenerationService()
+          .generateOne(resized, _specs![index], index);
+      final updated = List<Uint8List?>.from(state.generatedImages);
+      updated[index] = img ?? Uint8List(0);
+      state = state.copyWith(generatedImages: updated);
+    } catch (e, stack) {
+      await FirebaseService.recordError(
+        e, stack, reason: 'retry_image_generation_failed',
+      );
+      final failed = List<Uint8List?>.from(state.generatedImages);
+      failed[index] = Uint8List(0);
+      state = state.copyWith(generatedImages: failed);
+    }
+  }
+
   // ─── private ────────────────────────────────────────────
 
   /// 後台並行生成 8 張 AI 圓形貼圖；每張完成後立即更新對應卡片（非阻塞）
