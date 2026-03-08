@@ -528,8 +528,8 @@ class _StickerCard extends StatelessWidget {
       onTap: onTap,
     );
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
+    final card = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 28),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
@@ -549,6 +549,43 @@ class _StickerCard extends StatelessWidget {
       child: repaintKey != null
           ? RepaintBoundary(key: repaintKey, child: canvas)
           : canvas,
+    );
+
+    if (onTap == null) return card;
+
+    // 明顯可點擊的編輯按鈕，避免 Scale/HorizontalDrag gesture 衝突
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        card,
+        Positioned(
+          top: 10,
+          right: 36,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.edit_rounded,
+                size: 18,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
