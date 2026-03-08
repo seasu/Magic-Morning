@@ -85,10 +85,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         if (!granted) {
           throw GalException(
             type: GalExceptionType.accessDenied,
-            platformException: PlatformException(
+            error: PlatformException(
               code: 'ACCESS_DENIED',
               message: 'Storage access denied',
             ),
+            stackTrace: StackTrace.current,
           );
         }
       }
@@ -106,8 +107,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         _currentIndex++;
       });
     } on GalException catch (e, stack) {
-      // 記錄底層原因（platformException 為實際 PlatformException）
-      final pe = e.platformException;
+      // 記錄底層原因（e.error 為實際 PlatformException，gal 1.x API）
+      final pe = e.error;
       FirebaseService.log(
         'GalException type=${e.type.name} | '
         'underlying=${pe.runtimeType}: $pe',
