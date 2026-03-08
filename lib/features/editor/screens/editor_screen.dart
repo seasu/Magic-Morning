@@ -11,7 +11,6 @@ import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../home/providers/home_style_provider.dart';
 import '../../../core/theme/app_colors.dart';
