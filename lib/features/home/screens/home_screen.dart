@@ -8,8 +8,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../providers/home_style_provider.dart';
 import '../widgets/pick_image_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -88,6 +90,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             _buildAppBar(),
             Expanded(child: _buildHero()),
+            _buildStyleSelector(),
             _buildBottomActions(context),
           ],
         ),
@@ -120,7 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ShaderMask(
               shaderCallback: (b) => AppColors.gradient.createShader(b),
               child: Text(
-                'MagicMorning',
+                'Magic Sticker',
                 style: GoogleFonts.notoSansTc(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -177,23 +180,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             },
             child: Column(
               children: [
-                Text(
-                  '選一張照片',
-                  style: GoogleFonts.notoSansTc(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                    height: 1.1,
+                ShaderMask(
+                  shaderCallback: (b) => AppColors.gradient.createShader(b),
+                  child: Text(
+                    'Magic Sticker',
+                    style: GoogleFonts.notoSansTc(
+                      fontSize: 38,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1.1,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
                 Text(
-                  '一鍵生成 3 張 LINE 貼圖 ✨',
+                  '一鍵生成專屬 LINE 貼圖',
                   style: GoogleFonts.notoSansTc(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
-                    height: 1.3,
+                    height: 1.4,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -214,7 +220,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               return Opacity(opacity: t, child: child);
             },
             child: Text(
-              'AI 自動去背 · 生成文案 · 滑動選擇',
+              '上傳照片 · AI 生成 · 即刻下載',
               style: GoogleFonts.notoSansTc(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -230,6 +236,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           // 3 張貼圖預覽卡堆疊
           _StickerPreviewStack(controller: _entryCtrl),
         ],
+      ),
+    );
+  }
+
+  // ── 風格選擇橫向捲動列 ────────────────────────────────────────────────────
+
+  Widget _buildStyleSelector() {
+    final selectedIdx = ref.watch(homeStyleProvider);
+    return AnimatedBuilder(
+      animation: _entryCtrl,
+      builder: (_, child) {
+        final t = CurvedAnimation(
+          parent: _entryCtrl,
+          curve: const Interval(0.4, 0.9, curve: Curves.easeOutCubic),
+        ).value;
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(
+                '選擇貼圖風格',
+                style: GoogleFonts.notoSansTc(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 44,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemCount: StickerStyle.values.length,
+                itemBuilder: (context, i) {
+                  final style = StickerStyle.values[i];
+                  final isSelected = i == selectedIdx;
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref.read(homeStyleProvider.notifier).state = i;
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: isSelected ? AppColors.gradient : null,
+                        border: isSelected
+                            ? null
+                            : Border.all(
+                                color: AppColors.divider,
+                                width: 1.5,
+                              ),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(style.emoji, style: const TextStyle(fontSize: 16)),
+                          const SizedBox(width: 6),
+                          Text(
+                            style.label,
+                            style: GoogleFonts.notoSansTc(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -298,19 +391,19 @@ class _StickerPreviewStack extends StatelessWidget {
   // 從後到前排列：index 0 = 最底層，index 2 = 最上層
   static const _cards = [
     _CardData(
-      emoji: '🌟',
-      text: '元氣滿滿！',
-      gradientColors: [Color(0xFF22C55E), Color(0xFF16A34A)],
+      emoji: '🐱',
+      text: '哈哈哈！',
+      gradientColors: [Color(0xFFFFB347), Color(0xFFFF7F00)],
       angle: -0.14,
     ),
     _CardData(
-      emoji: '💫',
+      emoji: '🐶',
       text: '好棒棒～',
       gradientColors: [Color(0xFF60A5FA), Color(0xFF2563EB)],
       angle: 0.09,
     ),
     _CardData(
-      emoji: '❤️',
+      emoji: '🐻',
       text: '早安！',
       gradientColors: [Color(0xFFFD297B), Color(0xFFFF5E5E)],
       angle: 0.0,
@@ -320,7 +413,7 @@ class _StickerPreviewStack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 220,
+      height: 240,
       child: Stack(
         alignment: Alignment.center,
         children: List.generate(_cards.length, (i) {
@@ -366,7 +459,7 @@ class _CardData {
   });
 }
 
-/// LINE 貼圖樣式：漸層背景 + 大 emoji + 底部文字
+/// LINE 貼圖樣式：白底卡片 + 彩色圓形角色區 + 底部文字標籤
 class _MiniStickerCard extends StatelessWidget {
   final _CardData data;
 
@@ -375,41 +468,61 @@ class _MiniStickerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 160,
-      height: 160,
+      width: 148,
+      height: 178,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: data.gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: data.gradientColors.last.withOpacity(0.45),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(0.13),
+            blurRadius: 22,
+            offset: const Offset(0, 9),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
+        border: Border.all(
+          color: Colors.black.withOpacity(0.06),
+        ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(data.emoji, style: const TextStyle(fontSize: 64)),
-          const SizedBox(height: 8),
+          // 角色圓形區（模擬真實貼圖圓形主體）
+          Container(
+            width: 108,
+            height: 108,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: data.gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: data.gradientColors.last.withOpacity(0.30),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(data.emoji, style: const TextStyle(fontSize: 56)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 文字標籤
           Text(
             data.text,
             style: GoogleFonts.notoSansTc(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              shadows: [
-                const Shadow(
-                  color: Color(0x55000000),
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
-                ),
-              ],
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
           ),
         ],

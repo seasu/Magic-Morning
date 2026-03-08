@@ -13,6 +13,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
+import '../../home/providers/home_style_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/editor_state.dart';
 import '../models/sticker_config.dart';
@@ -48,7 +49,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(editorStateProvider(widget.imagePath).notifier).initialize();
+      final defaultStyle = ref.read(homeStyleProvider);
+      ref.read(editorStateProvider(widget.imagePath).notifier)
+          .initialize(defaultStyleIndex: defaultStyle);
     });
   }
 
@@ -139,7 +142,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         initialSchemeIndex: state.colorSchemeIndices[idx],
         initialScale: state.imageScales[idx],
         initialOffset: state.imageOffsets[idx],
+        initialImageAngle: state.imageAngles[idx],
         initialFontIndex: state.fontIndices[idx],
+        initialStyleIndex: state.styleIndices[idx],
         initialTextXAlign: state.textXAligns[idx],
         initialTextYAlign: state.textYAligns[idx],
         initialTextAngle: state.textAngles[idx],
@@ -148,9 +153,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         generatedImage: state.generatedImages[idx],
         onTextChanged: (text) => notifier.updateStickerText(idx, text),
         onSchemeChanged: (si) => notifier.updateColorSchemeIndex(idx, si),
-        onTransformChanged: (s, o) =>
-            notifier.updateImageTransform(idx, s, o),
+        onTransformChanged: (s, o, a) =>
+            notifier.updateImageTransform(idx, s, o, a),
         onFontChanged: (fi) => notifier.updateFontIndex(idx, fi),
+        onStyleChanged: (si) => notifier.updateStyleIndex(idx, si),
         onTextGestureChanged: (xAlign, yAlign, angle, sizeScale) =>
             notifier.updateTextTransform(
           idx,
@@ -181,71 +187,81 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final isReady = state.status == EditorStatus.ready;
     final isDone = isReady && _currentIndex >= 8;
 
+    // 當前張 AI 圖片仍在生成中（null = loading）→ 全畫面 loading 遮罩
+    final isCurrentImageLoading = isReady &&
+        !isDone &&
+        state.generatedImages[_currentIndex] == null;
+
     return Scaffold(
       backgroundColor: _kBg,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // ── 頂部列 ────────────────────────────────────────────────
-            _TopBar(
-              onBack: () => context.go('/'),
-              onRefresh: (isReady && !isDone) ? _regenerate : null,
+            // ── 主畫面內容 ─────────────────────────────────────────────
+            Column(
+              children: [
+                // ── 頂部列 ──────────────────────────────────────────────
+                _TopBar(
+                  onBack: () => context.go('/'),
+                  onRefresh: (isReady && !isDone) ? _regenerate : null,
+                ),
+
+                if (isLoading)
+                  const Expanded(child: _FunLoadingView())
+                else if (state.errorMessage != null)
+                  Expanded(child: _ErrorView(message: state.errorMessage!))
+                else if (isDone)
+                  Expanded(
+                    child: _CompletionView(
+                      keptCount: _keptCount,
+                      onRegenerate: _regenerate,
+                      onFinish: () => context.go('/'),
+                    ),
+                  )
+                else if (isReady) ...[
+                  // ── 進度條 ────────────────────────────────────────────
+                  _ProgressBar(current: _currentIndex),
+                  const SizedBox(height: 4),
+
+                  // ── 卡片層疊 ──────────────────────────────────────────
+                  Expanded(
+                    child: _CardStack(
+                      state: state,
+                      currentIndex: _currentIndex,
+                      repaintKeys: _repaintKeys,
+                      cardController: _cardController,
+                      onAccepted: _accept,
+                      onRejected: _reject,
+                      onEdit: _openEditSheet,
+                      onRetry: () => ref
+                          .read(
+                              editorStateProvider(widget.imagePath).notifier)
+                          .retryImageGeneration(_currentIndex),
+                    ),
+                  ),
+
+                  // ── Tinder 圓形按鈕 ───────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: _TinderButtons(
+                      isExporting: _isExporting,
+                      onNope: _isExporting
+                          ? null
+                          : () => _cardController.reject(),
+                      onLike: _isExporting
+                          ? null
+                          : () => _cardController.accept(),
+                    ),
+                  ),
+                ],
+              ],
             ),
 
-            if (isLoading)
-              const Expanded(child: _FunLoadingView())
-            else if (state.errorMessage != null)
-              Expanded(child: _ErrorView(message: state.errorMessage!))
-            else if (isDone)
-              Expanded(
-                child: _CompletionView(
-                  keptCount: _keptCount,
-                  onRegenerate: _regenerate,
-                  onFinish: () => context.go('/'),
-                ),
-              )
-            else if (isReady) ...[
-              // ── 進度條 ───────────────────────────────────────────────
-              _ProgressBar(current: _currentIndex),
-              const SizedBox(height: 4),
-
-              // ── 卡片層疊 ─────────────────────────────────────────────
-              Expanded(
-                child: _CardStack(
-                  state: state,
-                  currentIndex: _currentIndex,
-                  repaintKeys: _repaintKeys,
-                  cardController: _cardController,
-                  onAccepted: _accept,
-                  onRejected: _reject,
-                  onEdit: _openEditSheet,
-                  onRetry: () => ref
-                      .read(editorStateProvider(widget.imagePath).notifier)
-                      .retryImageGeneration(_currentIndex),
-                ),
+            // ── 圖片生成中：全畫面貓追老鼠遮罩（鎖定操作）───────────────
+            if (isCurrentImageLoading)
+              const AbsorbPointer(
+                child: _FunLoadingView(),
               ),
-
-              // ── 產圖風格選擇列（首次出現在結果畫面） ──────────────────
-              _StyleBar(
-                currentStyleIndex:
-                    state.styleIndices[_currentIndex.clamp(0, 7)],
-                onStyleChanged: (i) => ref
-                    .read(editorStateProvider(widget.imagePath).notifier)
-                    .updateStyleIndex(_currentIndex, i),
-              ),
-
-              // ── Tinder 圓形按鈕 ───────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _TinderButtons(
-                  isExporting: _isExporting,
-                  onNope:
-                      _isExporting ? null : () => _cardController.reject(),
-                  onLike:
-                      _isExporting ? null : () => _cardController.accept(),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -483,6 +499,7 @@ class _CardStack extends StatelessWidget {
                     state.colorSchemeIndices[currentIndex + 2]],
                 initialScale: state.imageScales[currentIndex + 2],
                 initialOffset: state.imageOffsets[currentIndex + 2],
+                initialImageAngle: state.imageAngles[currentIndex + 2],
                 fontIndex: state.fontIndices[currentIndex + 2],
                 fontSizeScale: state.fontSizeScales[currentIndex + 2],
                 textXAlign: state.textXAligns[currentIndex + 2],
@@ -506,6 +523,7 @@ class _CardStack extends StatelessWidget {
                     state.colorSchemeIndices[currentIndex + 1]],
                 initialScale: state.imageScales[currentIndex + 1],
                 initialOffset: state.imageOffsets[currentIndex + 1],
+                initialImageAngle: state.imageAngles[currentIndex + 1],
                 fontIndex: state.fontIndices[currentIndex + 1],
                 fontSizeScale: state.fontSizeScales[currentIndex + 1],
                 textXAlign: state.textXAligns[currentIndex + 1],
@@ -533,6 +551,7 @@ class _CardStack extends StatelessWidget {
                     kStickerConfigs[state.colorSchemeIndices[currentIndex]],
                 initialScale: state.imageScales[currentIndex],
                 initialOffset: state.imageOffsets[currentIndex],
+                initialImageAngle: state.imageAngles[currentIndex],
                 fontIndex: state.fontIndices[currentIndex],
                 fontSizeScale: state.fontSizeScales[currentIndex],
                 textXAlign: state.textXAligns[currentIndex],
@@ -574,6 +593,7 @@ class _StickerCard extends StatelessWidget {
   final StickerConfig config;
   final double initialScale;
   final Offset initialOffset;
+  final double initialImageAngle;
   final int fontIndex;
   final double fontSizeScale;
   final double textXAlign;
@@ -589,6 +609,7 @@ class _StickerCard extends StatelessWidget {
     required this.config,
     this.initialScale = 1.0,
     this.initialOffset = Offset.zero,
+    this.initialImageAngle = 0.0,
     this.fontIndex = 0,
     this.fontSizeScale = 1.0,
     this.textXAlign = 0.0,
@@ -606,6 +627,7 @@ class _StickerCard extends StatelessWidget {
       config: config,
       initialScale: initialScale,
       initialOffset: initialOffset,
+      initialImageAngle: initialImageAngle,
       fontIndex: fontIndex,
       fontSizeScale: fontSizeScale,
       textXAlign: textXAlign,
