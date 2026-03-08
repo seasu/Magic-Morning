@@ -182,71 +182,91 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final isReady = state.status == EditorStatus.ready;
     final isDone = isReady && _currentIndex >= 8;
 
+    // 當前張 AI 圖片仍在生成中（null = loading）→ 全畫面 loading 遮罩
+    final isCurrentImageLoading = isReady &&
+        !isDone &&
+        state.generatedImages[_currentIndex] == null;
+
     return Scaffold(
       backgroundColor: _kBg,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // ── 頂部列 ────────────────────────────────────────────────
-            _TopBar(
-              onBack: () => context.go('/'),
-              onRefresh: (isReady && !isDone) ? _regenerate : null,
+            // ── 主畫面內容 ─────────────────────────────────────────────
+            Column(
+              children: [
+                // ── 頂部列 ──────────────────────────────────────────────
+                _TopBar(
+                  onBack: () => context.go('/'),
+                  onRefresh: (isReady && !isDone) ? _regenerate : null,
+                ),
+
+                if (isLoading)
+                  const Expanded(child: _FunLoadingView())
+                else if (state.errorMessage != null)
+                  Expanded(child: _ErrorView(message: state.errorMessage!))
+                else if (isDone)
+                  Expanded(
+                    child: _CompletionView(
+                      keptCount: _keptCount,
+                      onRegenerate: _regenerate,
+                      onFinish: () => context.go('/'),
+                    ),
+                  )
+                else if (isReady) ...[
+                  // ── 進度條 ────────────────────────────────────────────
+                  _ProgressBar(current: _currentIndex),
+                  const SizedBox(height: 4),
+
+                  // ── 卡片層疊 ──────────────────────────────────────────
+                  Expanded(
+                    child: _CardStack(
+                      state: state,
+                      currentIndex: _currentIndex,
+                      repaintKeys: _repaintKeys,
+                      cardController: _cardController,
+                      onAccepted: _accept,
+                      onRejected: _reject,
+                      onEdit: _openEditSheet,
+                      onRetry: () => ref
+                          .read(
+                              editorStateProvider(widget.imagePath).notifier)
+                          .retryImageGeneration(_currentIndex),
+                    ),
+                  ),
+
+                  // ── 產圖風格選擇列 ─────────────────────────────────────
+                  _StyleBar(
+                    currentStyleIndex:
+                        state.styleIndices[_currentIndex.clamp(0, 7)],
+                    onStyleChanged: (i) => ref
+                        .read(
+                            editorStateProvider(widget.imagePath).notifier)
+                        .updateStyleIndex(_currentIndex, i),
+                  ),
+
+                  // ── Tinder 圓形按鈕 ───────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: _TinderButtons(
+                      isExporting: _isExporting,
+                      onNope: _isExporting
+                          ? null
+                          : () => _cardController.reject(),
+                      onLike: _isExporting
+                          ? null
+                          : () => _cardController.accept(),
+                    ),
+                  ),
+                ],
+              ],
             ),
 
-            if (isLoading)
-              const Expanded(child: _FunLoadingView())
-            else if (state.errorMessage != null)
-              Expanded(child: _ErrorView(message: state.errorMessage!))
-            else if (isDone)
-              Expanded(
-                child: _CompletionView(
-                  keptCount: _keptCount,
-                  onRegenerate: _regenerate,
-                  onFinish: () => context.go('/'),
-                ),
-              )
-            else if (isReady) ...[
-              // ── 進度條 ───────────────────────────────────────────────
-              _ProgressBar(current: _currentIndex),
-              const SizedBox(height: 4),
-
-              // ── 卡片層疊 ─────────────────────────────────────────────
-              Expanded(
-                child: _CardStack(
-                  state: state,
-                  currentIndex: _currentIndex,
-                  repaintKeys: _repaintKeys,
-                  cardController: _cardController,
-                  onAccepted: _accept,
-                  onRejected: _reject,
-                  onEdit: _openEditSheet,
-                  onRetry: () => ref
-                      .read(editorStateProvider(widget.imagePath).notifier)
-                      .retryImageGeneration(_currentIndex),
-                ),
+            // ── 圖片生成中：全畫面貓追老鼠遮罩（鎖定操作）───────────────
+            if (isCurrentImageLoading)
+              const AbsorbPointer(
+                child: _FunLoadingView(),
               ),
-
-              // ── 產圖風格選擇列（首次出現在結果畫面） ──────────────────
-              _StyleBar(
-                currentStyleIndex:
-                    state.styleIndices[_currentIndex.clamp(0, 7)],
-                onStyleChanged: (i) => ref
-                    .read(editorStateProvider(widget.imagePath).notifier)
-                    .updateStyleIndex(_currentIndex, i),
-              ),
-
-              // ── Tinder 圓形按鈕 ───────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _TinderButtons(
-                  isExporting: _isExporting,
-                  onNope:
-                      _isExporting ? null : () => _cardController.reject(),
-                  onLike:
-                      _isExporting ? null : () => _cardController.accept(),
-                ),
-              ),
-            ],
           ],
         ),
       ),
