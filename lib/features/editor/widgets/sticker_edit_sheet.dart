@@ -156,10 +156,7 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
     return Stack(
       children: [
         // ── 主內容 ─────────────────────────────────────────────────────
-        Padding(
-          padding: EdgeInsets.only(bottom: insets.bottom),
-          child: SingleChildScrollView(
-        child: Column(
+        Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // ── Drag handle ────────────────────────────────────────────
@@ -185,299 +182,307 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
             ),
             const SizedBox(height: 14),
 
-            // ── 貼圖預覽（文字可拖拉/捏合/旋轉）+ 虛線邊界框 ──────────
+            // ── 貼圖預覽（固定，不在 ScrollView 內，避免手勢衝突）─────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Stack(
-                children: [
-                  CustomPaint(
-                    foregroundPainter: const _BoundaryPainter(),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: StickerCanvas(
-                        subjectBytes: widget.subjectBytes,
-                        generatedImage: widget.generatedImage,
-                        text: _textCtrl.text,
-                        config: config,
-                        initialScale: widget.initialScale,
-                        initialOffset: widget.initialOffset,
-                        initialImageAngle: widget.initialImageAngle,
-                        fontIndex: _fontIndex,
-                        fontSizeScale: _textSizeScale,
-                        textXAlign: _textXAlign,
-                        textYAlign: _textYAlign,
-                        textAngle: _textAngle,
-                        enableTextGestures: true,
-                        onTransformChanged: widget.onTransformChanged,
-                        onTextGestureChanged: (xAlign, yAlign, angle, scale) {
-                          setState(() {
-                            _textXAlign = xAlign;
-                            _textYAlign = yAlign;
-                            _textAngle = angle;
-                            _textSizeScale = scale;
-                          });
-                          widget.onTextGestureChanged(
-                              xAlign, yAlign, angle, scale);
-                        },
-                      ),
-                    ),
-                  ),
-                  // 操作提示（選取物件後可移動・縮放・旋轉）
-                  Positioned(
-                    bottom: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black45,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        '點選物件 → 移動・縮放・旋轉',
-                        style: TextStyle(fontSize: 10, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── 文字編輯 ───────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionLabel('文字'),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _textCtrl,
-                    maxLines: 1,
-                    maxLength: 10,
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                      hintText: '輸入 2–6 字…',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      isDense: true,
-                      counterText: '',
-                    ),
-                    onChanged: (val) {
-                      setState(() {});
-                      widget.onTextChanged(val);
+              child: CustomPaint(
+                foregroundPainter: const _BoundaryPainter(),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: StickerCanvas(
+                    subjectBytes: widget.subjectBytes,
+                    generatedImage: widget.generatedImage,
+                    text: _textCtrl.text,
+                    config: config,
+                    initialScale: widget.initialScale,
+                    initialOffset: widget.initialOffset,
+                    initialImageAngle: widget.initialImageAngle,
+                    fontIndex: _fontIndex,
+                    fontSizeScale: _textSizeScale,
+                    textXAlign: _textXAlign,
+                    textYAlign: _textYAlign,
+                    textAngle: _textAngle,
+                    enableTextGestures: true,
+                    onTransformChanged: widget.onTransformChanged,
+                    onTextGestureChanged: (xAlign, yAlign, angle, scale) {
+                      setState(() {
+                        _textXAlign = xAlign;
+                        _textYAlign = yAlign;
+                        _textAngle = angle;
+                        _textSizeScale = scale;
+                      });
+                      widget.onTextGestureChanged(xAlign, yAlign, angle, scale);
                     },
                   ),
-                ],
+                ),
               ),
             ),
-            const SizedBox(height: 20),
 
-            // ── 字型選擇 ───────────────────────────────────────────────
+            // ── 操作提示（移至 canvas 下方，不再覆蓋圖片）─────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(32, 6, 32, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _SectionLabel('字型'),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: List.generate(kStickerFonts.length, (i) {
-                        final font = kStickerFonts[i];
-                        final isSelected = i == _fontIndex;
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _fontIndex = i);
-                            widget.onFontChanged(i);
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 18, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? Colors.black87
-                                  : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                color: isSelected
-                                    ? Colors.black87
-                                    : Colors.grey.shade300,
-                              ),
-                            ),
-                            child: Text(
-                              font.label,
-                              style: font.apply(TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.black87,
-                              )),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── 配色選擇 ───────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionLabel('配色'),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(kStickerConfigs.length, (i) {
-                      final c = kStickerConfigs[i].colorScheme;
-                      final isSelected = i == _schemeIndex;
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _schemeIndex = i);
-                          widget.onSchemeChanged(i);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: c.borderColor,
-                            border: isSelected
-                                ? Border.all(
-                                    color: Colors.black87, width: 2.5)
-                                : Border.all(
-                                    color: Colors.transparent, width: 2.5),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color:
-                                          c.borderColor.withOpacity(0.5),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    )
-                                  ]
-                                : null,
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── 產圖風格 ───────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionLabel('產圖風格'),
-                  const SizedBox(height: 4),
+                  Icon(Icons.touch_app_rounded,
+                      size: 12, color: Colors.grey.shade400),
+                  const SizedBox(width: 4),
                   Text(
-                    '切換後將確認並重新生成本張貼圖',
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade400),
+                    '點選物件 → 移動・縮放・旋轉',
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
                   ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children:
-                          List.generate(StickerStyle.values.length, (i) {
-                        final style = StickerStyle.values[i];
-                        final isSelected = i == _styleIndex;
-                        return GestureDetector(
-                          onTap: () => _onStyleTap(i),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 13, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? Colors.black87
-                                  : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected
-                                    ? Colors.black87
-                                    : Colors.grey.shade300,
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // ── 可捲動的編輯控制區 ─────────────────────────────────────
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(bottom: insets.bottom),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+
+                    // ── 文字編輯 ─────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SectionLabel('文字'),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _textCtrl,
+                            maxLines: 1,
+                            maxLength: 10,
+                            textAlign: TextAlign.center,
+                            decoration: InputDecoration(
+                              hintText: '輸入 2–6 字…',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
+                              isDense: true,
+                              counterText: '',
                             ),
+                            onChanged: (val) {
+                              setState(() {});
+                              widget.onTextChanged(val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── 字型選擇 ─────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SectionLabel('字型'),
+                          const SizedBox(height: 10),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(style.emoji,
-                                    style:
-                                        const TextStyle(fontSize: 14)),
-                                const SizedBox(width: 5),
-                                Text(
-                                  style.label,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.black87,
+                              children: List.generate(kStickerFonts.length, (i) {
+                                final font = kStickerFonts[i];
+                                final isSelected = i == _fontIndex;
+                                return GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _fontIndex = i);
+                                    widget.onFontChanged(i);
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 18, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.black87
+                                          : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(22),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? Colors.black87
+                                            : Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      font.label,
+                                      style: font.apply(TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      )),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── 配色選擇 ─────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SectionLabel('配色'),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: List.generate(kStickerConfigs.length, (i) {
+                              final c = kStickerConfigs[i].colorScheme;
+                              final isSelected = i == _schemeIndex;
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _schemeIndex = i);
+                                  widget.onSchemeChanged(i);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: c.borderColor,
+                                    border: isSelected
+                                        ? Border.all(
+                                            color: Colors.black87, width: 2.5)
+                                        : Border.all(
+                                            color: Colors.transparent,
+                                            width: 2.5),
+                                    boxShadow: isSelected
+                                        ? [
+                                            BoxShadow(
+                                              color:
+                                                  c.borderColor.withOpacity(0.5),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            )
+                                          ]
+                                        : null,
                                   ),
                                 ),
-                              ],
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── 產圖風格 ─────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SectionLabel('產圖風格'),
+                          const SizedBox(height: 4),
+                          Text(
+                            '切換後將確認並重新生成本張貼圖',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade400),
+                          ),
+                          const SizedBox(height: 10),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: List.generate(
+                                  StickerStyle.values.length, (i) {
+                                final style = StickerStyle.values[i];
+                                final isSelected = i == _styleIndex;
+                                return GestureDetector(
+                                  onTap: () => _onStyleTap(i),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 13, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.black87
+                                          : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? Colors.black87
+                                            : Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(style.emoji,
+                                            style: const TextStyle(
+                                                fontSize: 14)),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          style.label,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
                             ),
                           ),
-                        );
-                      }),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-            // ── 完成按鈕 ───────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed:
-                      _isRegenerating ? null : () => Navigator.of(context).pop(),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                    // ── 完成按鈕 ─────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _isRegenerating
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          style: FilledButton.styleFrom(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            '完成',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    '完成',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  ],
                 ),
               ),
             ),
           ],
         ),
-      ),
-    ),
 
         // ── 重新生成中 Loading 遮罩 ─────────────────────────────────────
         if (_isRegenerating)
