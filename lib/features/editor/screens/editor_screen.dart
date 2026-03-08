@@ -107,17 +107,17 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         _currentIndex++;
       });
     } on GalException catch (e, stack) {
-      // 記錄底層原因（e.error 為實際 PlatformException，gal 1.x API）
-      final pe = e.error;
+      // e.error 在 gal 1.x 為 Object?，需要 null-aware 處理
+      final pe = e.error as PlatformException?;
       FirebaseService.log(
         'GalException type=${e.type.name} | '
-        'underlying=${pe.runtimeType}: $pe',
+        'underlying=${pe?.runtimeType}: $pe',
       );
       FirebaseService.log(
-        'PlatformException code=${pe.code} '
-        'message=${pe.message} details=${pe.details}',
+        'PlatformException code=${pe?.code} '
+        'message=${pe?.message} details=${pe?.details}',
       );
-      await FirebaseService.recordError(pe, stack,
+      await FirebaseService.recordError(pe ?? e, stack,
           reason: 'editor_export_failed/gal_${e.type.name}');
       await FirebaseService.recordError(e, stack,
           reason: 'editor_export_failed');
