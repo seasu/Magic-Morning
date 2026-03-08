@@ -103,6 +103,20 @@ class _EditorFamilyNotifier
     await retryImageGeneration(stickerIdx);
   }
 
+  /// 使用者調整字體大小倍率
+  void updateFontSizeScale(int stickerIdx, double scale) {
+    final updated = List<double>.from(state.fontSizeScales);
+    updated[stickerIdx] = scale;
+    state = state.copyWith(fontSizeScales: updated);
+  }
+
+  /// 使用者調整文字垂直位置 (-1.0=上, 1.0=下)
+  void updateTextYAlign(int stickerIdx, double yAlign) {
+    final updated = List<double>.from(state.textYAligns);
+    updated[stickerIdx] = yAlign;
+    state = state.copyWith(textYAligns: updated);
+  }
+
   /// 使用者在編輯 popup 縮放/位移圖片
   void updateImageTransform(int stickerIdx, double scale, Offset offset) {
     final scales = List<double>.from(state.imageScales);

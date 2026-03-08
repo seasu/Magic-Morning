@@ -145,6 +145,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         initialOffset: state.imageOffsets[idx],
         initialFontIndex: state.fontIndices[idx],
         initialStyleIndex: state.styleIndices[idx],
+        initialFontSizeScale: state.fontSizeScales[idx],
+        initialTextYAlign: state.textYAligns[idx],
         subjectBytes: state.subjectBytes,
         generatedImage: state.generatedImages[idx],
         onTextChanged: (text) => notifier.updateStickerText(idx, text),
@@ -153,6 +155,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             notifier.updateImageTransform(idx, s, o),
         onFontChanged: (fi) => notifier.updateFontIndex(idx, fi),
         onStyleChanged: (si) => notifier.updateStyleIndex(idx, si),
+        onFontSizeScaleChanged: (scale) =>
+            notifier.updateFontSizeScale(idx, scale),
+        onTextYAlignChanged: (align) =>
+            notifier.updateTextYAlign(idx, align),
       ),
     );
   }
@@ -360,6 +366,8 @@ class _CardStack extends StatelessWidget {
                 initialScale: state.imageScales[currentIndex + 2],
                 initialOffset: state.imageOffsets[currentIndex + 2],
                 fontIndex: state.fontIndices[currentIndex + 2],
+                fontSizeScale: state.fontSizeScales[currentIndex + 2],
+                textYAlign: state.textYAligns[currentIndex + 2],
               ),
             ),
           ),
@@ -379,6 +387,8 @@ class _CardStack extends StatelessWidget {
                 initialScale: state.imageScales[currentIndex + 1],
                 initialOffset: state.imageOffsets[currentIndex + 1],
                 fontIndex: state.fontIndices[currentIndex + 1],
+                fontSizeScale: state.fontSizeScales[currentIndex + 1],
+                textYAlign: state.textYAligns[currentIndex + 1],
               ),
             ),
           ),
@@ -401,6 +411,8 @@ class _CardStack extends StatelessWidget {
                 initialScale: state.imageScales[currentIndex],
                 initialOffset: state.imageOffsets[currentIndex],
                 fontIndex: state.fontIndices[currentIndex],
+                fontSizeScale: state.fontSizeScales[currentIndex],
+                textYAlign: state.textYAligns[currentIndex],
                 onTap: onEdit,
               ),
               // ── 生成中 badge ──────────────────────────────────────
@@ -437,6 +449,8 @@ class _StickerCard extends StatelessWidget {
   final double initialScale;
   final Offset initialOffset;
   final int fontIndex;
+  final double fontSizeScale;
+  final double textYAlign;
   final VoidCallback? onTap;
 
   const _StickerCard({
@@ -448,6 +462,8 @@ class _StickerCard extends StatelessWidget {
     this.initialScale = 1.0,
     this.initialOffset = Offset.zero,
     this.fontIndex = 0,
+    this.fontSizeScale = 1.0,
+    this.textYAlign = 0.85,
     this.onTap,
   });
 
@@ -461,6 +477,8 @@ class _StickerCard extends StatelessWidget {
       initialScale: initialScale,
       initialOffset: initialOffset,
       fontIndex: fontIndex,
+      fontSizeScale: fontSizeScale,
+      textYAlign: textYAlign,
       onTap: onTap,
     );
 

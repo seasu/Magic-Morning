@@ -27,6 +27,8 @@ class EditorState {
   final List<Offset> imageOffsets;        // 每張貼圖的位移量
   final List<int> fontIndices;            // 每張貼圖的字型索引 (0-4)
   final List<int> styleIndices;           // 每張貼圖的產圖風格索引 (0-4)
+  final List<double> fontSizeScales;      // 每張貼圖的字體大小倍率 (0.4–2.0)
+  final List<double> textYAligns;         // 每張貼圖的文字垂直對齊 (-1.0=上, 1.0=下)
 
   EditorState({
     required this.originalImagePath,
@@ -41,6 +43,8 @@ class EditorState {
     List<Offset>? imageOffsets,
     List<int>? fontIndices,
     List<int>? styleIndices,
+    List<double>? fontSizeScales,
+    List<double>? textYAligns,
   })  : stickerTexts = stickerTexts ?? List.from(_kFallbackTexts),
         generatedImages = generatedImages ?? List.filled(8, null),
         imageErrors = imageErrors ?? List.filled(8, null),
@@ -48,7 +52,9 @@ class EditorState {
         imageScales = imageScales ?? List.filled(8, 1.0),
         imageOffsets = imageOffsets ?? List.filled(8, Offset.zero),
         fontIndices = fontIndices ?? List.filled(8, 0),
-        styleIndices = styleIndices ?? List.filled(8, 0);
+        styleIndices = styleIndices ?? List.filled(8, 0),
+        fontSizeScales = fontSizeScales ?? List.filled(8, 1.0),
+        textYAligns = textYAligns ?? List.filled(8, 0.85);
 
   EditorState copyWith({
     Uint8List? subjectBytes,
@@ -62,6 +68,8 @@ class EditorState {
     List<Offset>? imageOffsets,
     List<int>? fontIndices,
     List<int>? styleIndices,
+    List<double>? fontSizeScales,
+    List<double>? textYAligns,
   }) {
     return EditorState(
       originalImagePath: originalImagePath,
@@ -76,6 +84,8 @@ class EditorState {
       imageOffsets: imageOffsets ?? this.imageOffsets,
       fontIndices: fontIndices ?? this.fontIndices,
       styleIndices: styleIndices ?? this.styleIndices,
+      fontSizeScales: fontSizeScales ?? this.fontSizeScales,
+      textYAligns: textYAligns ?? this.textYAligns,
     );
   }
 }

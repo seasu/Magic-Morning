@@ -26,6 +26,12 @@ class StickerCanvas extends StatefulWidget {
   /// 字型索引（對應 kStickerFonts，0 = 黑體預設）
   final int fontIndex;
 
+  /// 字體大小倍率（0.4–2.0，預設 1.0）
+  final double fontSizeScale;
+
+  /// 文字垂直對齊（-1.0=置頂, 0=置中, 1.0=置底，預設 0.85 接近底部）
+  final double textYAlign;
+
   /// 點圖回呼（用於打開編輯 popup）
   final VoidCallback? onTap;
 
@@ -43,6 +49,8 @@ class StickerCanvas extends StatefulWidget {
     this.initialScale = 1.0,
     this.initialOffset = Offset.zero,
     this.fontIndex = 0,
+    this.fontSizeScale = 1.0,
+    this.textYAlign = 0.85,
     this.onTap,
     this.onTransformChanged,
   });
@@ -145,15 +153,17 @@ class _StickerCanvasState extends State<StickerCanvas> {
               ),
             ),
           ),
-          // 文字 overlay（底部對齊，Flutter 負責渲染）
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 14,
-            child: _OutlinedStickerText(
-              text: widget.text,
-              config: widget.config,
-              fontIndex: widget.fontIndex,
+          // 文字 overlay（可調垂直位置，Flutter 負責渲染）
+          Align(
+            alignment: Alignment(0, widget.textYAlign),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _OutlinedStickerText(
+                text: widget.text,
+                config: widget.config,
+                fontIndex: widget.fontIndex,
+                fontSizeScale: widget.fontSizeScale,
+              ),
             ),
           ),
         ],
@@ -191,21 +201,25 @@ class _OutlinedStickerText extends StatelessWidget {
   final String text;
   final StickerConfig config;
   final int fontIndex;
+  final double fontSizeScale;
 
   const _OutlinedStickerText({
     required this.text,
     required this.config,
     this.fontIndex = 0,
+    this.fontSizeScale = 1.0,
   });
 
-  static const _kFontSize = 22.0;
+  /// 基礎字體大小（不使用 FittedBox，避免文字被強制撐滿整寬）
+  static const _kBaseFontSize = 36.0;
 
   @override
   Widget build(BuildContext context) {
-    const baseStyle = TextStyle(
-      fontSize: _kFontSize,
+    final fontSize = _kBaseFontSize * fontSizeScale;
+    final baseStyle = TextStyle(
+      fontSize: fontSize,
       fontWeight: FontWeight.w900,
-      height: 1.2,
+      height: 1.15,
     );
     final font = kStickerFonts[fontIndex.clamp(0, kStickerFonts.length - 1)];
     final styledBase = font.apply(baseStyle);
@@ -213,10 +227,12 @@ class _OutlinedStickerText extends StatelessWidget {
     final outlineText = Text(
       text,
       textAlign: TextAlign.center,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
       style: styledBase.copyWith(
         foreground: Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 5
+          ..strokeWidth = (fontSize * 0.14).clamp(3.0, 7.0)
           ..strokeJoin = StrokeJoin.round
           ..color = Colors.white,
       ),
@@ -224,19 +240,15 @@ class _OutlinedStickerText extends StatelessWidget {
     final fillText = Text(
       text,
       textAlign: TextAlign.center,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
       style: styledBase.copyWith(color: config.colorScheme.textFill),
     );
 
-    return SizedBox(
-      width: double.infinity,
-      child: FittedBox(
-        fit: BoxFit.fitWidth,
-        child: Stack(
-          alignment: Alignment.center,
-          textDirection: TextDirection.ltr,
-          children: [outlineText, fillText],
-        ),
-      ),
+    return Stack(
+      alignment: Alignment.center,
+      textDirection: TextDirection.ltr,
+      children: [outlineText, fillText],
     );
   }
 }
