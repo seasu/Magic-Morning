@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/sticker_spec.dart';
+import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/services/gemini_service.dart';
 import '../../../core/services/sticker_generation_service.dart';
@@ -27,8 +28,13 @@ class _EditorFamilyNotifier
   EditorState build(String arg) => EditorState(originalImagePath: arg);
 
   /// 初始化：兩步流程
-  Future<void> initialize() async {
-    state = state.copyWith(status: EditorStatus.generatingTexts);
+  ///
+  /// [defaultStyleIndex] 對應 [StickerStyle.values]，預設 0（Q版卡通）
+  Future<void> initialize({int defaultStyleIndex = 0}) async {
+    state = state.copyWith(
+      status: EditorStatus.generatingTexts,
+      styleIndices: List.filled(8, defaultStyleIndex),
+    );
 
     Uint8List resized;
     try {
@@ -161,14 +167,26 @@ class _EditorFamilyNotifier
     clearErrors[index] = null;
     state = state.copyWith(generatedImages: reset, imageErrors: clearErrors);
 
+    final styleIdx = state.styleIndices[index];
+    final style = StickerStyle.values[styleIdx.clamp(0, StickerStyle.values.length - 1)];
+
     try {
       final resized = await ImageProcessor.resizeForNative(
           File(state.originalImagePath));
+
+      // 「原圖」風格：直接使用照片，不呼叫 API
+      if (style.isPhotoMode) {
+        final updated = List<Uint8List?>.from(state.generatedImages);
+        updated[index] = resized;
+        state = state.copyWith(generatedImages: updated);
+        return;
+      }
+
       final bytes = await StickerGenerationService().generateSingle(
         resized,
         _specs![index],
         index: index,
-        styleIndex: state.styleIndices[index],
+        styleIndex: styleIdx,
       );
       final updated = List<Uint8List?>.from(state.generatedImages);
       final errors = List<String?>.from(state.imageErrors);
@@ -198,12 +216,23 @@ class _EditorFamilyNotifier
       Uint8List photoBytes, List<StickerSpec> specs) async {
     final service = StickerGenerationService();
     for (int i = 0; i < specs.length; i++) {
+      final styleIdx = state.styleIndices[i];
+      final style = StickerStyle.values[styleIdx.clamp(0, StickerStyle.values.length - 1)];
+
+      // 「原圖」風格：直接使用照片，不呼叫 API
+      if (style.isPhotoMode) {
+        final updated = List<Uint8List?>.from(state.generatedImages);
+        updated[i] = photoBytes;
+        state = state.copyWith(generatedImages: updated);
+        continue;
+      }
+
       try {
         final bytes = await service.generateSingle(
           photoBytes,
           specs[i],
           index: i,
-          styleIndex: state.styleIndices[i],
+          styleIndex: styleIdx,
         );
         final updated = List<Uint8List?>.from(state.generatedImages);
         final errors = List<String?>.from(state.imageErrors);

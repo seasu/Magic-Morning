@@ -8,8 +8,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../providers/home_style_provider.dart';
 import '../widgets/pick_image_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -88,6 +90,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             _buildAppBar(),
             Expanded(child: _buildHero()),
+            _buildStyleSelector(),
             _buildBottomActions(context),
           ],
         ),
@@ -230,6 +233,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           // 3 張貼圖預覽卡堆疊
           _StickerPreviewStack(controller: _entryCtrl),
         ],
+      ),
+    );
+  }
+
+  // ── 風格選擇橫向捲動列 ────────────────────────────────────────────────────
+
+  Widget _buildStyleSelector() {
+    final selectedIdx = ref.watch(homeStyleProvider);
+    return AnimatedBuilder(
+      animation: _entryCtrl,
+      builder: (_, child) {
+        final t = CurvedAnimation(
+          parent: _entryCtrl,
+          curve: const Interval(0.4, 0.9, curve: Curves.easeOutCubic),
+        ).value;
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(
+                '選擇貼圖風格',
+                style: GoogleFonts.notoSansTc(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 44,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemCount: StickerStyle.values.length,
+                itemBuilder: (context, i) {
+                  final style = StickerStyle.values[i];
+                  final isSelected = i == selectedIdx;
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref.read(homeStyleProvider.notifier).state = i;
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: isSelected ? AppColors.gradient : null,
+                        border: isSelected
+                            ? null
+                            : Border.all(
+                                color: AppColors.divider,
+                                width: 1.5,
+                              ),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(style.emoji, style: const TextStyle(fontSize: 16)),
+                          const SizedBox(width: 6),
+                          Text(
+                            style.label,
+                            style: GoogleFonts.notoSansTc(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

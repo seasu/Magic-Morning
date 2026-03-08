@@ -13,6 +13,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
+import '../../home/providers/home_style_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/editor_state.dart';
 import '../models/sticker_config.dart';
@@ -48,7 +49,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(editorStateProvider(widget.imagePath).notifier).initialize();
+      final defaultStyle = ref.read(homeStyleProvider);
+      ref.read(editorStateProvider(widget.imagePath).notifier)
+          .initialize(defaultStyleIndex: defaultStyle);
     });
   }
 

@@ -1,17 +1,22 @@
 /// 貼圖產圖風格選項
 ///
 /// 每種風格會改變傳給 Gemini 的 prompt，生成不同美術風格的貼圖。
+/// [photo] 風格例外：跳過 Gemini，直接使用原始照片。
 enum StickerStyle {
   chibi('Q版卡通', '🎨'),
   popArt('普普風', '🟡'),
   pixel('像素風', '🕹️'),
   sketch('素描', '✏️'),
-  watercolor('水彩', '🎨');
+  watercolor('水彩', '🎨'),
+  photo('原圖', '📸');
 
   const StickerStyle(this.label, this.emoji);
 
   final String label;
   final String emoji;
+
+  /// 是否為直接使用原始照片（跳過 Gemini API）
+  bool get isPhotoMode => this == StickerStyle.photo;
 
   /// 插入 prompt 的角色外觀描述段落
   String get characterDesc => switch (this) {
@@ -40,6 +45,7 @@ enum StickerStyle {
               '  * Soft rounded face with gentle color washes that bleed at edges\n'
               '  * Translucent layered colors, slight paper texture visible\n'
               '  * Dreamy, cute watercolor quality',
+        StickerStyle.photo => '',
       };
 
   /// 插入 prompt 末尾的風格指令句
@@ -60,5 +66,6 @@ enum StickerStyle {
           'Soft watercolor painting style — gentle color washes bleeding at edges, '
               'translucent layered colors, slight paper texture. '
               'Cute and dreamy watercolor quality.',
+        StickerStyle.photo => '',
       };
 }
