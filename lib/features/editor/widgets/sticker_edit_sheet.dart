@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,10 +10,12 @@ import 'sticker_canvas.dart';
 
 /// 點圖後彈出的編輯 Bottom Sheet
 ///
-/// 提供五種編輯功能：
+/// 提供六種編輯功能：
 /// - 圖片縮放/位移（pinch-zoom + pan）
 /// - 文字編輯（即時預覽）
 /// - 字型選擇（5 種繁中字體）
+/// - 字體大小調整（0.4x – 2.0x 滑桿）
+/// - 文字垂直位置調整（滑桿）
 /// - 配色選擇（8 組預設色系）
 /// - 產圖風格（Q版卡通 / 普普風 / 像素風 / 素描 / 水彩）
 class StickerEditSheet extends StatefulWidget {
@@ -22,6 +26,8 @@ class StickerEditSheet extends StatefulWidget {
   final Offset initialOffset;
   final int initialFontIndex;
   final int initialStyleIndex;
+  final double initialFontSizeScale;
+  final double initialTextYAlign;
   final Uint8List? subjectBytes;
   final Uint8List? generatedImage;
   final ValueChanged<String> onTextChanged;
@@ -29,6 +35,8 @@ class StickerEditSheet extends StatefulWidget {
   final void Function(double scale, Offset offset) onTransformChanged;
   final ValueChanged<int> onFontChanged;
   final ValueChanged<int> onStyleChanged;
+  final ValueChanged<double> onFontSizeScaleChanged;
+  final ValueChanged<double> onTextYAlignChanged;
 
   const StickerEditSheet({
     super.key,
@@ -39,6 +47,8 @@ class StickerEditSheet extends StatefulWidget {
     required this.initialOffset,
     this.initialFontIndex = 0,
     this.initialStyleIndex = 0,
+    this.initialFontSizeScale = 1.0,
+    this.initialTextYAlign = 0.85,
     this.subjectBytes,
     this.generatedImage,
     required this.onTextChanged,
@@ -46,6 +56,8 @@ class StickerEditSheet extends StatefulWidget {
     required this.onTransformChanged,
     required this.onFontChanged,
     required this.onStyleChanged,
+    required this.onFontSizeScaleChanged,
+    required this.onTextYAlignChanged,
   });
 
   @override
@@ -57,6 +69,8 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
   late int _schemeIndex;
   late int _fontIndex;
   late int _styleIndex;
+  late double _fontSizeScale;
+  late double _textYAlign;
 
   @override
   void initState() {
@@ -65,6 +79,8 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
     _schemeIndex = widget.initialSchemeIndex;
     _fontIndex = widget.initialFontIndex;
     _styleIndex = widget.initialStyleIndex;
+    _fontSizeScale = widget.initialFontSizeScale;
+    _textYAlign = widget.initialTextYAlign;
   }
 
   @override
@@ -107,20 +123,25 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── 貼圖預覽（可縮放/拖曳）────────────────────────────────
+            // ── 貼圖預覽（可縮放/拖曳）+ 虛線邊界框 ──────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: StickerCanvas(
-                  subjectBytes: widget.subjectBytes,
-                  generatedImage: widget.generatedImage,
-                  text: _textCtrl.text,
-                  config: config,
-                  initialScale: widget.initialScale,
-                  initialOffset: widget.initialOffset,
-                  fontIndex: _fontIndex,
-                  onTransformChanged: widget.onTransformChanged,
+              child: CustomPaint(
+                foregroundPainter: const _BoundaryPainter(),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: StickerCanvas(
+                    subjectBytes: widget.subjectBytes,
+                    generatedImage: widget.generatedImage,
+                    text: _textCtrl.text,
+                    config: config,
+                    initialScale: widget.initialScale,
+                    initialOffset: widget.initialOffset,
+                    fontIndex: _fontIndex,
+                    fontSizeScale: _fontSizeScale,
+                    textYAlign: _textYAlign,
+                    onTransformChanged: widget.onTransformChanged,
+                  ),
                 ),
               ),
             ),
@@ -212,6 +233,112 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // ── 字體大小 ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _SectionLabel('字體大小'),
+                      const Spacer(),
+                      Text(
+                        '${(_fontSizeScale * 100).round()}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 8),
+                      overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 16),
+                    ),
+                    child: Slider(
+                      value: _fontSizeScale,
+                      min: 0.4,
+                      max: 2.0,
+                      divisions: 32,
+                      onChanged: (v) {
+                        setState(() => _fontSizeScale = v);
+                        widget.onFontSizeScaleChanged(v);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            // ── 文字位置 ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _SectionLabel('文字位置'),
+                      const Spacer(),
+                      Text(
+                        _textYAlign < -0.3
+                            ? '偏上'
+                            : _textYAlign > 0.3
+                                ? '偏下'
+                                : '置中',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text('上',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade500)),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 8),
+                            overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 16),
+                          ),
+                          child: Slider(
+                            value: _textYAlign,
+                            min: -1.0,
+                            max: 1.0,
+                            divisions: 40,
+                            onChanged: (v) {
+                              setState(() => _textYAlign = v);
+                              widget.onTextYAlignChanged(v);
+                            },
+                          ),
+                        ),
+                      ),
+                      Text('下',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade500)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // ── 配色選擇 ──────────────────────────────────────────────
             Padding(
@@ -381,4 +508,40 @@ class _SectionLabel extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── 貼圖最大邊界虛線框 ─────────────────────────────────────────────────────
+
+class _BoundaryPainter extends CustomPainter {
+  const _BoundaryPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFBBBBBB)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    const dashLen = 5.0;
+    const gapLen = 4.0;
+    const radius = 16.0;
+
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        const Radius.circular(radius),
+      ));
+
+    for (final metric in path.computeMetrics()) {
+      double dist = 0;
+      while (dist < metric.length) {
+        final end = (dist + dashLen).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(dist, end), paint);
+        dist += dashLen + gapLen;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
