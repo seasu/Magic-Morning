@@ -107,17 +107,17 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         _currentIndex++;
       });
     } on GalException catch (e, stack) {
-      // 記錄底層原因（e.error 為實際 PlatformException，gal 1.x API）
-      final pe = e.error;
+      // e.error 在 gal 1.x 為 Object?，需要 null-aware 處理
+      final pe = e.error as PlatformException?;
       FirebaseService.log(
         'GalException type=${e.type.name} | '
-        'underlying=${pe.runtimeType}: $pe',
+        'underlying=${pe?.runtimeType}: $pe',
       );
       FirebaseService.log(
-        'PlatformException code=${pe.code} '
-        'message=${pe.message} details=${pe.details}',
+        'PlatformException code=${pe?.code} '
+        'message=${pe?.message} details=${pe?.details}',
       );
-      await FirebaseService.recordError(pe, stack,
+      await FirebaseService.recordError(pe ?? e, stack,
           reason: 'editor_export_failed/gal_${e.type.name}');
       await FirebaseService.recordError(e, stack,
           reason: 'editor_export_failed');
@@ -357,7 +357,7 @@ class _ProgressBar extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 color: isPast
-                    ? _kLikeColor.withOpacity(0.6)
+                    ? _kLikeColor.withValues(alpha: 0.6)
                     : isActive
                         ? Colors.black87
                         : Colors.grey.shade300,
@@ -556,12 +556,12 @@ class _StickerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.16),
+            color: Colors.black.withValues(alpha: 0.16),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -593,7 +593,7 @@ class _StickerCard extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.18),
+                    color: Colors.black.withValues(alpha: 0.18),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -658,7 +658,7 @@ class _StatusBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.red.withOpacity(0.35),
+                color: Colors.red.withValues(alpha: 0.35),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -878,7 +878,7 @@ class _CircleButtonState extends State<_CircleButton>
             boxShadow: [
               if (enabled)
                 BoxShadow(
-                  color: widget.shadowColor.withOpacity(0.28),
+                  color: widget.shadowColor.withValues(alpha: 0.28),
                   blurRadius: 20,
                   offset: const Offset(0, 6),
                   spreadRadius: 1,
@@ -975,7 +975,7 @@ class _CompletionViewState extends State<_CompletionView>
                       ? [
                           BoxShadow(
                             color:
-                                const Color(0xFFFF5864).withOpacity(0.35),
+                                const Color(0xFFFF5864).withValues(alpha: 0.35),
                             blurRadius: 28,
                             offset: const Offset(0, 10),
                           ),
@@ -1017,7 +1017,7 @@ class _CompletionViewState extends State<_CompletionView>
                 style: GoogleFonts.notoSansTc(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary.withOpacity(0.6),
+                  color: AppColors.textSecondary.withValues(alpha: 0.6),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1033,7 +1033,7 @@ class _CompletionViewState extends State<_CompletionView>
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF5864).withOpacity(0.30),
+                      color: const Color(0xFFFF5864).withValues(alpha: 0.30),
                       blurRadius: 22,
                       offset: const Offset(0, 8),
                     ),
@@ -1233,7 +1233,7 @@ class _BounceDots extends AnimatedWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Color.lerp(
-                  const Color(0xFF2D6A9F).withOpacity(0.3),
+                  const Color(0xFF2D6A9F).withValues(alpha: 0.3),
                   const Color(0xFF2D6A9F),
                   s,
                 ),
