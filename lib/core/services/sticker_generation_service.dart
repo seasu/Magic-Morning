@@ -149,10 +149,10 @@ DESIGN REQUIREMENTS:
 - ${style.characterDesc}
 - DO NOT draw any text or letters inside the image
 - 3–5 small sparkles / stars scattered inside the circle
-- White outline (4 px) around the circle
-- Pure white background outside the circle
+- NO white outline, NO white border around the circle
+- The area outside the circle must be completely transparent (alpha = 0), no fill at all
 
-OUTPUT: A single square image (equal width and height) containing exactly this ONE circular sticker.
+OUTPUT: A single square PNG (equal width and height) with a transparent background outside the circle, containing exactly this ONE circular sticker.
 STYLE: ${style.promptSuffix}
 ''';
     } else {
@@ -165,9 +165,9 @@ DESIGN REQUIREMENTS:
 - ${style.characterDesc}
 - DO NOT draw any text or letters inside the image
 - 3–5 small sparkles / stars scattered in the background
-- A subtle rounded border (4 px) in a complementary color at the edges
+- NO white border or white outline anywhere
 
-OUTPUT: A single square image containing exactly this ONE sticker.
+OUTPUT: A single square PNG containing exactly this ONE sticker with no white background.
 STYLE: ${style.promptSuffix}
 ''';
     }
