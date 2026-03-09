@@ -24,6 +24,9 @@ class _EditorFamilyNotifier
   /// AI 自由規格暫存（不放進 state 以免觸發多餘 rebuild）
   List<StickerSpec>? _specs;
 
+  /// 每次重新生成遞增，用來取消舊的背景任務
+  int _generationId = 0;
+
   @override
   EditorState build(String arg) => EditorState(originalImagePath: arg);
 
@@ -54,7 +57,8 @@ class _EditorFamilyNotifier
     _specs = await GeminiService().generateStickerSpecs(resized);
     final texts = _specs!.map((s) => s.text).toList();
     state = state.copyWith(stickerTexts: texts, status: EditorStatus.ready);
-    unawaited(_generateImagesInBackground(resized, _specs!));
+    final genId = ++_generationId;
+    unawaited(_generateImagesInBackground(resized, _specs!, genId));
   }
 
   /// 重新讓 AI 自由發揮，生成全新 8 組規格 + 圖片
@@ -71,7 +75,8 @@ class _EditorFamilyNotifier
       _specs = await GeminiService().generateStickerSpecs(resized);
       final texts = _specs!.map((s) => s.text).toList();
       state = state.copyWith(stickerTexts: texts, status: EditorStatus.ready);
-      unawaited(_generateImagesInBackground(resized, _specs!));
+      final genId = ++_generationId;
+      unawaited(_generateImagesInBackground(resized, _specs!, genId));
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'editor_regen_failed');
       state = state.copyWith(status: EditorStatus.ready);
@@ -213,14 +218,18 @@ class _EditorFamilyNotifier
   ///   Uint8List(0)  → 失敗（imageErrors[i] 有原因）
   ///   Uint8List(>0) → 成功
   Future<void> _generateImagesInBackground(
-      Uint8List photoBytes, List<StickerSpec> specs) async {
+      Uint8List photoBytes, List<StickerSpec> specs, int genId) async {
     final service = StickerGenerationService();
     for (int i = 0; i < specs.length; i++) {
+      // 若已有新一輪重新生成，停止舊任務
+      if (genId != _generationId) return;
+
       final styleIdx = state.styleIndices[i];
       final style = StickerStyle.values[styleIdx.clamp(0, StickerStyle.values.length - 1)];
 
       // 「原圖」風格：直接使用照片，不呼叫 API
       if (style.isPhotoMode) {
+        if (genId != _generationId) return;
         final updated = List<Uint8List?>.from(state.generatedImages);
         updated[i] = photoBytes;
         state = state.copyWith(generatedImages: updated);
@@ -234,12 +243,14 @@ class _EditorFamilyNotifier
           index: i,
           styleIndex: styleIdx,
         );
+        if (genId != _generationId) return;
         final updated = List<Uint8List?>.from(state.generatedImages);
         final errors = List<String?>.from(state.imageErrors);
         updated[i] = bytes ?? Uint8List(0);
         if (bytes == null) errors[i] = 'API 未回傳圖片';
         state = state.copyWith(generatedImages: updated, imageErrors: errors);
       } catch (e, stack) {
+        if (genId != _generationId) return;
         await FirebaseService.recordError(e, stack,
             reason: 'background_image_gen_failed_index$i');
         final failed = List<Uint8List?>.from(state.generatedImages);
