@@ -11,6 +11,7 @@ import '../../../core/services/firebase_service.dart';
 import '../../../core/services/gemini_service.dart';
 import '../../../core/services/sticker_generation_service.dart';
 import '../../../core/utils/image_processor.dart';
+import '../../billing/providers/credit_provider.dart';
 import '../models/editor_state.dart';
 
 /// 以 imagePath 為 key 的 provider
@@ -59,7 +60,12 @@ class _EditorFamilyNotifier
       return;
     }
 
-    _specs = await GeminiService().generateStickerSpecs(resized);
+    final result = await GeminiService().generateStickerSpecs(resized);
+    _specs = result.specs;
+    // 若 Cloud Function 回傳剩餘點數（≥ 0），更新本地顯示
+    if (result.remainingCredits >= 0) {
+      ref.read(creditProvider.notifier).updateCredits(result.remainingCredits);
+    }
     final texts = _specs!.map((s) => s.text).toList();
     state = state.copyWith(stickerTexts: texts, status: EditorStatus.ready);
     final genId = ++_generationId;
@@ -77,7 +83,11 @@ class _EditorFamilyNotifier
       final resized = await ImageProcessor.resizeForNative(
         File(state.originalImagePath),
       );
-      _specs = await GeminiService().generateStickerSpecs(resized);
+      final result = await GeminiService().generateStickerSpecs(resized);
+      _specs = result.specs;
+      if (result.remainingCredits >= 0) {
+        ref.read(creditProvider.notifier).updateCredits(result.remainingCredits);
+      }
       final texts = _specs!.map((s) => s.text).toList();
       state = state.copyWith(stickerTexts: texts, status: EditorStatus.ready);
       final genId = ++_generationId;

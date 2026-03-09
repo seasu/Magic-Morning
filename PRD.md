@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | MagicMorning（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v2.9.0+89 |
+| 目前版本 | v3.0.0+95 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash（圖片生成）|
@@ -23,16 +23,31 @@
 - Flutter 端先 Resize ≤ 1080px（`image_processor.dart`），避免傳送巨圖給 API 造成 OOM
 - Resize 後以 Base64 傳送至 Gemini
 
-### 2.2 AI 貼圖生成（Gemini 2.0 Flash）
+### 2.2 AI 貼圖生成（Gemini 2.0 Flash — 透過 Cloud Functions）
+
+**安全架構（v3.0 起）**
+
+> Gemini API Key 不再打包進 App，完全存放於 Firebase Cloud Functions 環境變數，防止反編譯洩漏。
 
 **生成流程**
 ```
 選圖 → Resize（≤1080px）
-  → 呼叫 GeminiService.generateStickerSpecs()：取得 8 組貼圖文案/風格規格
-  → 並行觸發 8 個 Gemini 圖片生成任務（逐一背景更新）
+  → Cloud Function: generateStickerSpecs
+      ├── 驗證 Firebase Auth
+      ├── Firestore Transaction 原子性扣 1 點
+      └── 呼叫 Gemini 2.0 Flash（文字）→ 取得 8 組規格
+  → 並行觸發 8 個 Cloud Function: generateStickerImage
+      ├── 驗證 Firebase Auth（無再次扣點）
+      └── 呼叫 Gemini 2.5 Flash（圖片）→ 回傳 PNG base64
   → 每張完成後即時顯示在對應 Swipe 卡片
   → 失敗 → Flutter fallback（彩色背景 + 文字疊加）
 ```
+
+**Cloud Functions 規格**
+| Function | 記憶體 | 逾時 | 說明 |
+|---|---|---|---|
+| `generateStickerSpecs` | 512 MiB | 60s | 扣點 + AI 文字規格 |
+| `generateStickerImage` | 1 GiB | 120s | AI 圖片生成（proxy） |
 
 **輸出規格（LINE Creators Market 官方）**
 | 項目 | 規格 |
@@ -42,14 +57,6 @@
 | 輸出格式 | **PNG 透明背景** |
 | 單檔上限 | **1 MB** |
 | 一組數量 | **8 張**（LINE Creators Market 最低門檻） |
-
-**Gemini API 規格**
-| 項目 | 規格 |
-|---|---|
-| 模型 | `gemini-2.0-flash-exp`（支援圖片輸出） |
-| 輸入 | 原圖 Base64 + 文字 prompt（每張獨立呼叫） |
-| 輸出 | 完整圓形貼圖 PNG（Q 版頭像 + 彩色背景 + 中文文字） |
-| 逾時 | 30 秒/張 |
 
 ### 2.3 Tinder 滑卡挑選介面
 - 8 張貼圖以 **Tinder 風格堆疊卡片**呈現
@@ -195,6 +202,7 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.0.0 | 2026-03-09 | **安全升級**：Gemini API Key 移至 Firebase Cloud Functions，App 完全不含金鑰；新增 `generateStickerSpecs` / `generateStickerImage` 兩支 Cloud Functions；點數扣除移至 server 端原子性處理；CI/CD 加入 functions deploy 步驟 |
 | v2.9.0 | 2026-03-09 | Firebase Auth 帳號系統：匿名訪客 1 點；Google/Apple 登入升級 5 點；Firestore 雲端點數；訪客刪 App 重裝僅得 1 點（iOS Keychain 保護）；LoginBottomSheet |
 | v2.8.0 | 2026-03-09 | 免費版廣告點數系統：新增 CreditProvider / AdsService / CreditPaywallDialog；首次安裝贈 3 點，看廣告解鎖 1 次；AppBar 即時點數徽章 |
 | v2.1.5 | 2026-03-08 | 編輯畫面新增虛線邊界框；字體大小與文字位置滑桿；移除 FittedBox 修正預設字型過大問題 |

@@ -261,8 +261,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       if (!earned || !mounted) return;
     }
 
-    await ref.read(creditProvider.notifier).consumeCredit();
-
+    // 點數由 Cloud Function (generateStickerSpecs) 原子性扣除
     setState(() {
       _currentIndex = 0;
       _keptCount = 0;

@@ -102,9 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
     if (result == null || !context.mounted) return;
 
-    // ③ 扣點（已確認有足夠點數，此步驟必定成功）
-    await ref.read(creditProvider.notifier).consumeCredit();
-
+    // ③ 點數扣除由 Cloud Function (generateStickerSpecs) 原子性處理
     // ④ 立即跳 editor，loading 馬上開始
     context.push(
       '/editor',
