@@ -1,7 +1,7 @@
 name: magic_morning
 description: AI 一鍵產 LINE 貼圖 — MagicMorning
 publish_to: 'none'
-version: 2.7.2+87
+version: 2.9.3+92
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -48,6 +48,15 @@ dependencies:
   # App info
   package_info_plus: ^8.0.0
 
+  # Ads & Monetization
+  google_mobile_ads: ^5.3.0
+
+  # Auth & Cloud Database
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.0
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -59,8 +68,9 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/app_icon.png"
+  remove_alpha_ios: true
   min_sdk_android: 26
-  adaptive_icon_background: "#FF555F"
+  adaptive_icon_background: "#F06292"
   adaptive_icon_foreground: "assets/app_icon.png"
   web:
     generate: false

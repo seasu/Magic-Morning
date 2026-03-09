@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | MagicMorning（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v2.1.5+57 |
+| 目前版本 | v2.9.0+89 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash（圖片生成）|
@@ -93,6 +93,25 @@
 
 ### 狀態管理（Riverpod）
 ```
+authStateProvider → StreamProvider<User?>
+├── Firebase Anonymous Auth（訪客）→ Firestore 建立文件，1 點
+├── Google Sign-In / Apple Sign-In → 升級帳號，最低 5 點
+└── iOS Keychain 保護：重裝後匿名 UID 不變（Android 重裝才重置）
+
+creditProvider → int (點數，來自 Firestore)
+├── 訪客首次 1 點（降低重裝誘因）
+├── 登入升級 5 點
+├── 看廣告 +1 點（AdMob Rewarded Ad）
+├── 購買點數包（未來 IAP 串接）
+└── Firestore: users/{uid}/credits（原子性 Transaction 扣點）
+
+Firestore 資料結構:
+users/{uid}/
+  credits: int        ← 點數
+  isAnonymous: bool   ← 訪客/正式帳號
+  createdAt: Timestamp
+  updatedAt: Timestamp
+
 editorStateProvider(imagePath) → EditorState
 ├── status: idle / generatingTexts / ready
 ├── stickerTexts[8]       ← AI 生成標語
@@ -116,6 +135,7 @@ lib/
 │   │   ├── sticker_spec.dart         # AI 生成規格（文字/風格）
 │   │   └── sticker_style.dart        # 產圖風格 Enum
 │   ├── services/
+│   │   ├── ads_service.dart          # AdMob Rewarded Ad 單例
 │   │   ├── firebase_service.dart
 │   │   ├── gemini_service.dart       # generateStickerSpecs()
 │   │   └── sticker_generation_service.dart  # generateSingle()
@@ -125,6 +145,9 @@ lib/
 │       └── image_processor.dart      # Resize ≤ 1080px
 ├── features/
 │   ├── home/                         # 照片選取首頁
+│   ├── billing/
+│   │   └── providers/
+│   │       └── credit_provider.dart  # 點數狀態（Riverpod）
 │   └── editor/
 │       ├── models/
 │       │   ├── editor_state.dart
@@ -140,6 +163,10 @@ lib/
 │           ├── sticker_swipe_card.dart
 │           ├── sticker_edit_sheet.dart
 │           └── canvas_preview.dart
+├── shared/
+│   └── widgets/
+│       ├── credit_badge.dart         # AppBar 點數徽章
+│       └── credit_paywall_dialog.dart # 點數不足 Paywall Dialog
 └── native/
     └── method_channel.dart           # Android/iOS 原生橋接（備用）
 ```
@@ -168,6 +195,8 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v2.9.0 | 2026-03-09 | Firebase Auth 帳號系統：匿名訪客 1 點；Google/Apple 登入升級 5 點；Firestore 雲端點數；訪客刪 App 重裝僅得 1 點（iOS Keychain 保護）；LoginBottomSheet |
+| v2.8.0 | 2026-03-09 | 免費版廣告點數系統：新增 CreditProvider / AdsService / CreditPaywallDialog；首次安裝贈 3 點，看廣告解鎖 1 次；AppBar 即時點數徽章 |
 | v2.1.5 | 2026-03-08 | 編輯畫面新增虛線邊界框；字體大小與文字位置滑桿；移除 FittedBox 修正預設字型過大問題 |
 | v2.1.4 | 2026-03-08 | 每張卡片「AI 生成中」badge 換成 🐱🐭 迷你彈跳動畫 |
 | v2.1.3 | 2026-03-08 | 修正 linter errors（unused import、unnecessary import） |
