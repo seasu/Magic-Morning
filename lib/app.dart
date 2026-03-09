@@ -6,6 +6,14 @@ import 'features/dev_log/screens/log_viewer_screen.dart';
 import 'features/editor/screens/editor_screen.dart';
 import 'features/home/screens/home_screen.dart';
 
+/// 跳轉至 /editor 時攜帶的參數
+class EditorArgs {
+  final String imagePath;
+  final int styleIndex;
+
+  const EditorArgs({required this.imagePath, required this.styleIndex});
+}
+
 final _router = GoRouter(
   initialLocation: '/',
   routes: [
@@ -16,8 +24,11 @@ final _router = GoRouter(
     GoRoute(
       path: '/editor',
       builder: (_, state) {
-        final imagePath = state.extra as String;
-        return EditorScreen(imagePath: imagePath);
+        final args = state.extra as EditorArgs;
+        return EditorScreen(
+          imagePath: args.imagePath,
+          styleIndex: args.styleIndex,
+        );
       },
     ),
     GoRoute(
