@@ -14,7 +14,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/services/firebase_service.dart';
-import '../../home/providers/home_style_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/editor_state.dart';
 import '../models/sticker_config.dart';
@@ -31,8 +30,13 @@ const _kLikeColor = AppColors.like;
 
 class EditorScreen extends ConsumerStatefulWidget {
   final String imagePath;
+  final int styleIndex;
 
-  const EditorScreen({super.key, required this.imagePath});
+  const EditorScreen({
+    super.key,
+    required this.imagePath,
+    this.styleIndex = 0,
+  });
 
   @override
   ConsumerState<EditorScreen> createState() => _EditorScreenState();
@@ -50,9 +54,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final defaultStyle = ref.read(homeStyleProvider);
       ref.read(editorStateProvider(widget.imagePath).notifier)
-          .initialize(defaultStyleIndex: defaultStyle);
+          .initialize(defaultStyleIndex: widget.styleIndex);
     });
   }
 

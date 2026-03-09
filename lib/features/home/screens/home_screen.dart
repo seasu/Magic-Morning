@@ -8,10 +8,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../app.dart';
 import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/theme/app_colors.dart';
-import '../providers/home_style_provider.dart';
 import '../widgets/pick_image_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -71,13 +71,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
+  /// 兩步流程：先選圖 → 再選風格 → 立即跳 loading
   Future<void> _pickImage(BuildContext context, ImageSource source) async {
     HapticFeedback.mediumImpact();
     FirebaseService.log('HomeScreen._pickImage: source=${source.name}');
+
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: source, imageQuality: 95);
     if (picked == null || !context.mounted) return;
-    context.push('/editor', extra: picked.path);
+
+    // 選完圖後彈出風格選擇 sheet
+    final styleIndex = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _StylePickerSheet(),
+    );
+    if (styleIndex == null || !context.mounted) return;
+
+    // 立即跳 editor，loading 馬上開始
+    context.push(
+      '/editor',
+      extra: EditorArgs(imagePath: picked.path, styleIndex: styleIndex),
+    );
   }
 
   @override
@@ -90,7 +107,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             _buildAppBar(),
             Expanded(child: _buildHero()),
-            _buildStyleSelector(),
             _buildBottomActions(context),
           ],
         ),
@@ -98,7 +114,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  // ── App Bar：品牌漸層 Logo ────────────────────────────────────────────────
+  // ── App Bar ───────────────────────────────────────────────────────────────
 
   Widget _buildAppBar() {
     return AnimatedBuilder(
@@ -154,7 +170,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  // ── Hero：標語 + 3 張貼圖預覽卡堆疊 ─────────────────────────────────────
+  // ── Hero ──────────────────────────────────────────────────────────────────
 
   Widget _buildHero() {
     return Padding(
@@ -162,7 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 主標語（slide up + fade in）
+          // 主標語
           AnimatedBuilder(
             animation: _entryCtrl,
             builder: (_, child) {
@@ -172,10 +188,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ).value;
               return Opacity(
                 opacity: t,
-                child: Transform.translate(
-                  offset: Offset(0, 24 * (1 - t)),
-                  child: child,
-                ),
+                child:
+                    Transform.translate(offset: Offset(0, 24 * (1 - t)), child: child),
               );
             },
             child: Column(
@@ -220,7 +234,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               return Opacity(opacity: t, child: child);
             },
             child: Text(
-              '上傳照片 · AI 生成 · 即刻下載',
+              '上傳照片 · 選擇風格 · AI 生成 · 即刻下載',
               style: GoogleFonts.notoSansTc(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -240,94 +254,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  // ── 風格選擇橫向捲動列 ────────────────────────────────────────────────────
-
-  Widget _buildStyleSelector() {
-    final selectedIdx = ref.watch(homeStyleProvider);
-    return AnimatedBuilder(
-      animation: _entryCtrl,
-      builder: (_, child) {
-        final t = CurvedAnimation(
-          parent: _entryCtrl,
-          curve: const Interval(0.4, 0.9, curve: Curves.easeOutCubic),
-        ).value;
-        return Opacity(
-          opacity: t,
-          child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Text(
-                '選擇貼圖風格',
-                style: GoogleFonts.notoSansTc(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemCount: StickerStyle.values.length,
-                itemBuilder: (context, i) {
-                  final style = StickerStyle.values[i];
-                  final isSelected = i == selectedIdx;
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      ref.read(homeStyleProvider.notifier).state = i;
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: isSelected ? AppColors.gradient : null,
-                        border: isSelected
-                            ? null
-                            : Border.all(
-                                color: AppColors.divider,
-                                width: 1.5,
-                              ),
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(style.emoji, style: const TextStyle(fontSize: 16)),
-                          const SizedBox(width: 6),
-                          Text(
-                            style.label,
-                            style: GoogleFonts.notoSansTc(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? Colors.white : AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── 底部按鈕（fade + slide up） ─────────────────────────────────────────
+  // ── 底部按鈕 ──────────────────────────────────────────────────────────────
 
   Widget _buildBottomActions(BuildContext context) {
     return AnimatedBuilder(
@@ -339,10 +266,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ).value;
         return Opacity(
           opacity: t,
-          child: Transform.translate(
-            offset: Offset(0, 32 * (1 - t)),
-            child: child,
-          ),
+          child: Transform.translate(offset: Offset(0, 32 * (1 - t)), child: child),
         );
       },
       child: Padding(
@@ -381,6 +305,195 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
+// ── 風格選擇 Bottom Sheet ──────────────────────────────────────────────────────
+
+class _StylePickerSheet extends StatelessWidget {
+  const _StylePickerSheet();
+
+  // 每個風格的簡短說明
+  static const _descs = [
+    '可愛 Q 版插畫',    // chibi
+    '普普風鮮豔色彩',  // popArt
+    '復古像素點陣',    // pixel
+    '手繪素描質感',    // sketch
+    '夢幻水彩風格',    // watercolor
+    '高精細寫實人像',  // photo
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Drag handle ─────────────────────────────────────────────
+          const SizedBox(height: 14),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ── 標題 ──────────────────────────────────────────────────
+          ShaderMask(
+            shaderCallback: (b) => AppColors.gradient.createShader(b),
+            child: Text(
+              '選擇貼圖風格',
+              style: GoogleFonts.notoSansTc(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '選完後 AI 立刻開始生成 ✨',
+            style: GoogleFonts.notoSansTc(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // ── 風格卡片 3×2 Grid ─────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.95,
+              children: List.generate(StickerStyle.values.length, (i) {
+                final style = StickerStyle.values[i];
+                return _StyleCard(
+                  style: style,
+                  description: _descs[i],
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.of(context).pop(i);
+                  },
+                );
+              }),
+            ),
+          ),
+
+          const SizedBox(height: 28),
+        ],
+      ),
+    );
+  }
+}
+
+class _StyleCard extends StatefulWidget {
+  final StickerStyle style;
+  final String description;
+  final VoidCallback onTap;
+
+  const _StyleCard({
+    required this.style,
+    required this.description,
+    required this.onTap,
+  });
+
+  @override
+  State<_StyleCard> createState() => _StyleCardState();
+}
+
+class _StyleCardState extends State<_StyleCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _press;
+
+  @override
+  void initState() {
+    super.initState();
+    _press = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      lowerBound: 0.0,
+      upperBound: 0.06,
+    );
+  }
+
+  @override
+  void dispose() {
+    _press.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _press.forward(),
+      onTapUp: (_) {
+        _press.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _press.reverse(),
+      child: AnimatedBuilder(
+        animation: _press,
+        builder: (_, child) => Transform.scale(
+          scale: 1.0 - _press.value,
+          child: child,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.divider, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                widget.style.emoji,
+                style: const TextStyle(fontSize: 30),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                widget.style.label,
+                style: GoogleFonts.notoSansTc(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.description,
+                style: GoogleFonts.notoSansTc(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── 3 張貼圖預覽卡堆疊（裝飾性，交錯動畫進場） ──────────────────────────────
 
 class _StickerPreviewStack extends StatelessWidget {
@@ -388,7 +501,6 @@ class _StickerPreviewStack extends StatelessWidget {
 
   const _StickerPreviewStack({required this.controller});
 
-  // 從後到前排列：index 0 = 最底層，index 2 = 最上層
   static const _cards = [
     _CardData(
       emoji: '🐱',
@@ -459,7 +571,6 @@ class _CardData {
   });
 }
 
-/// LINE 貼圖樣式：白底卡片 + 彩色圓形角色區 + 底部文字標籤
 class _MiniStickerCard extends StatelessWidget {
   final _CardData data;
 
@@ -485,14 +596,11 @@ class _MiniStickerCard extends StatelessWidget {
             offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.06),
-        ),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 角色圓形區（模擬真實貼圖圓形主體）
           Container(
             width: 108,
             height: 108,
@@ -516,7 +624,6 @@ class _MiniStickerCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // 文字標籤
           Text(
             data.text,
             style: GoogleFonts.notoSansTc(
