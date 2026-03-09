@@ -60,6 +60,9 @@ class StickerCanvas extends StatefulWidget {
   /// true → 啟用選取模式（編輯 Sheet），false → 主卡片模式
   final bool enableTextGestures;
 
+  /// false → 停用所有手勢（圖片/文字皆無法拖拉/縮放），用於選擇畫面純預覽
+  final bool interactive;
+
   /// 外部顯式指定選取目標（由 StickerEditSheet 的模式按鈕控制）
   /// 設定後 canvas 不再透過 tap 自行切換 _EditTarget
   final StickerEditTarget? externalTarget;
@@ -97,6 +100,7 @@ class StickerCanvas extends StatefulWidget {
     this.textYAlign = 0.85,
     this.textAngle = 0.0,
     this.enableTextGestures = false,
+    this.interactive = true,
     this.externalTarget,
     this.onTap,
     this.onTransformChanged,
@@ -289,9 +293,9 @@ class _StickerCanvasState extends State<StickerCanvas> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onScaleStart: _onScaleStart,
-      onScaleUpdate: _onScaleUpdate,
-      onScaleEnd: _onScaleEnd,
+      onScaleStart: widget.interactive ? _onScaleStart : null,
+      onScaleUpdate: widget.interactive ? _onScaleUpdate : null,
+      onScaleEnd: widget.interactive ? _onScaleEnd : null,
       child: AspectRatio(
         aspectRatio: StickerCanvas.aspectRatio,
         child: _hasAiImage

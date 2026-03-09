@@ -627,6 +627,7 @@ class _StickerCard extends StatelessWidget {
       textXAlign: textXAlign,
       textYAlign: textYAlign,
       textAngle: textAngle,
+      interactive: false, // 選擇畫面純預覽，不可拖拉圖片位置
       onTap: onTap,
       stickerShape: stickerShape,
     );
