@@ -70,6 +70,19 @@ class CreditNotifier extends Notifier<int> {
     FirebaseService.log('CreditProvider: +$amount → total ${state}');
   }
 
+  /// Cloud Function 回傳的最新點數直接寫入（免去一次 Firestore 讀取）
+  void updateCredits(int credits) {
+    state = credits;
+    FirebaseService.log('CreditProvider: server-sync → $credits credits');
+  }
+
+  /// 從 Firestore 重新讀取點數（Cloud Function 扣點後同步 UI 用）
+  Future<void> reload() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+    await _loadCredits(user.uid);
+  }
+
   // ── Private ────────────────────────────────────────────────────────────────
 
   void _onUserChanged(User? user) {

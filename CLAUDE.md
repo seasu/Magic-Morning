@@ -1,4 +1,9 @@
-# 🤖 Claude 開發指令集 (CLAUDE.md) - v1.4
+# 🤖 Claude 開發指令集 (CLAUDE.md) - v1.6
+
+> ⚠️ **每次 commit 前的強制規則（不可跳過）：**
+> 1. 更新 `pubspec.yaml` 的 `version`（遞增 patch 或 minor）
+> 2. 更新 `PRD.md` 反映最新變更
+> 若未執行以上兩步，**不得建立 commit**。
 
 ## 📌 角色定位
 
@@ -66,6 +71,9 @@ Magic-Morning/
 - **Crashlytics:** 全域 `FlutterError.onError` + `PlatformDispatcher.instance.onError`
 - **Analytics:** 關鍵用戶行為埋點
 - **App Distribution / Hosting:** 測試版分發
+- **Cloud Functions (v3.0+):** Gemini API Key 存放於 Cloud Functions Secret，App 不含金鑰
+  - `generateStickerSpecs` — 驗證 Auth + 原子性扣點 + 呼叫 Gemini 文字 API
+  - `generateStickerImage` — 驗證 Auth + proxy Gemini 圖片 API
 
 ### CI/CD (GitHub Actions)
 - 檔案位置: `.github/workflows/main_build.yml`（待建立）
