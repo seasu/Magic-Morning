@@ -1,15 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/auth_service.dart';
 import '../../../core/services/firebase_service.dart';
-
-// ── 常數 ──────────────────────────────────────────────────────────────────────
-
-/// 新用戶首次安裝贈送的免費點數
-const _kInitialFreeCredits = 3;
-
-/// SharedPreferences key
-const _kCreditsKey = 'user_credits';
+import '../../auth/providers/auth_provider.dart';
 
 /// 每次看廣告獲得的點數
 const int kCreditsPerAd = 1;
@@ -22,66 +16,82 @@ final creditProvider = NotifierProvider<CreditNotifier, int>(
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
+/// Firestore 為主的點數 Provider
+///
+/// 點數存在 Firestore `users/{uid}/credits`。
+/// 切換帳號（匿名 → 登入）時自動重新載入。
 class CreditNotifier extends Notifier<int> {
+  String? _lastUid;
+
   @override
   int build() {
-    // 非同步載入，初始值先給 0；載入完成後 state 會更新
-    _load();
-    return 0;
+    // 監聽 auth 狀態，用戶切換時重新載入點數
+    ref.listen<User?>(currentUserProvider, (prev, next) {
+      if (next?.uid != prev?.uid) {
+        _onUserChanged(next);
+      }
+    });
+
+    // 初始化：讀取目前用戶的點數
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      _loadCredits(user.uid);
+    }
+
+    return 0; // 同步初始值，_loadCredits 非同步更新
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
-  /// 是否有足夠點數（>= 1）
   bool get hasCredit => state > 0;
 
-  /// 消耗 1 點（生成前呼叫）。
+  /// 消耗 1 點（透過 Firestore Transaction，防止 race condition）
   ///
-  /// 回傳 `true` 表示扣點成功，`false` 表示點數不足。
+  /// 回傳 `true` = 扣點成功
   Future<bool> consumeCredit() async {
+    final uid = ref.read(currentUserProvider)?.uid;
+    if (uid == null) return false;
+
     if (state <= 0) return false;
-    final newVal = state - 1;
-    state = newVal;
-    await _persist(newVal);
-    FirebaseService.log('CreditProvider: consumed 1 credit → remaining $newVal');
-    return true;
+
+    final success = await AuthService.consumeCredit(uid);
+    if (success) {
+      state = state - 1;
+      FirebaseService.log('CreditProvider: consumed 1 → remaining ${state}');
+    }
+    return success;
   }
 
-  /// 增加點數（看廣告 / 購買後呼叫）
+  /// 增加點數（看廣告 / 登入獎勵後呼叫）
   Future<void> addCredits(int amount) async {
-    final newVal = state + amount;
-    state = newVal;
-    await _persist(newVal);
-    FirebaseService.log('CreditProvider: +$amount credits → total $newVal');
+    final uid = ref.read(currentUserProvider)?.uid;
+    if (uid == null) return;
+
+    await AuthService.addCredits(uid, amount);
+    state = state + amount;
+    FirebaseService.log('CreditProvider: +$amount → total ${state}');
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
 
-  Future<void> _load() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      // 首次安裝：key 不存在 → 贈送免費點數
-      if (!prefs.containsKey(_kCreditsKey)) {
-        await prefs.setInt(_kCreditsKey, _kInitialFreeCredits);
-        state = _kInitialFreeCredits;
-        FirebaseService.log(
-          'CreditProvider: new user → gifted $_kInitialFreeCredits free credits',
-        );
-      } else {
-        state = prefs.getInt(_kCreditsKey) ?? 0;
-        FirebaseService.log('CreditProvider: loaded ${state} credits');
-      }
-    } catch (e, stack) {
-      await FirebaseService.recordError(e, stack, reason: 'credit_load_failed');
+  void _onUserChanged(User? user) {
+    _lastUid = user?.uid;
+    if (user == null) {
+      state = 0;
+    } else {
+      _loadCredits(user.uid);
     }
   }
 
-  Future<void> _persist(int value) async {
+  Future<void> _loadCredits(String uid) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_kCreditsKey, value);
+      final credits = await AuthService.getCredits(uid);
+      if (credits != null && ref.read(currentUserProvider)?.uid == uid) {
+        state = credits;
+        FirebaseService.log('CreditProvider: loaded $credits credits for uid=$uid');
+      }
     } catch (e, stack) {
-      await FirebaseService.recordError(e, stack, reason: 'credit_persist_failed');
+      await FirebaseService.recordError(e, stack, reason: 'credit_load_failed');
     }
   }
 }
