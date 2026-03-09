@@ -331,10 +331,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                               editorStateProvider(widget.imagePath).notifier)
                           .retryImageGeneration(_currentIndex),
                       stickerShape: state.stickerShape,
-                      onTransformChanged: (s, o, a) => ref
-                          .read(
-                              editorStateProvider(widget.imagePath).notifier)
-                          .updateImageTransform(_currentIndex, s, o, a),
                     ),
                   ),
 
@@ -460,8 +456,6 @@ class _CardStack extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback? onRetry;
   final StickerShape stickerShape;
-  final void Function(double scale, Offset offset, double angle)?
-      onTransformChanged;
 
   const _CardStack({
     required this.state,
@@ -473,7 +467,6 @@ class _CardStack extends StatelessWidget {
     required this.onEdit,
     this.onRetry,
     this.stickerShape = StickerShape.circle,
-    this.onTransformChanged,
   });
 
   @override
@@ -557,8 +550,6 @@ class _CardStack extends StatelessWidget {
                 textAngle: state.textAngles[currentIndex],
                 onTap: onEdit,
                 stickerShape: stickerShape,
-                interactive: true,
-                onTransformChanged: onTransformChanged,
               ),
               // ── 生成中 badge ──────────────────────────────────────────
               if (state.generatedImages[currentIndex] == null)
@@ -602,9 +593,6 @@ class _StickerCard extends StatelessWidget {
   final double textAngle;
   final VoidCallback? onTap;
   final StickerShape stickerShape;
-  final bool interactive;
-  final void Function(double scale, Offset offset, double angle)?
-      onTransformChanged;
 
   const _StickerCard({
     this.repaintKey,
@@ -622,8 +610,6 @@ class _StickerCard extends StatelessWidget {
     this.textAngle = 0.0,
     this.onTap,
     this.stickerShape = StickerShape.circle,
-    this.interactive = false,
-    this.onTransformChanged,
   });
 
   @override
@@ -641,8 +627,6 @@ class _StickerCard extends StatelessWidget {
       textXAlign: textXAlign,
       textYAlign: textYAlign,
       textAngle: textAngle,
-      interactive: interactive,
-      onTransformChanged: onTransformChanged,
       onTap: onTap,
       stickerShape: stickerShape,
     );
