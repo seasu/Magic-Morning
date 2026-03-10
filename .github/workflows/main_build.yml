@@ -27,15 +27,35 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
       - name: Write google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_ANDROID }}
         run: |
           if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "ERROR: GOOGLE_SERVICES_JSON_ANDROID secret is not set"
+            echo "❌ ERROR: GOOGLE_SERVICES_JSON_ANDROID secret is not set"
             exit 1
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          # 驗證 JSON 格式與必要欄位
+          python3 - <<'PYEOF'
+import json, sys
+try:
+    data = json.load(open("android/app/google-services.json"))
+except json.JSONDecodeError as e:
+    print(f"❌ google-services.json is not valid JSON: {e}")
+    sys.exit(1)
+if "project_info" not in data:
+    print("❌ google-services.json is missing 'project_info' — please re-download from Firebase Console")
+    sys.exit(1)
+proj = data["project_info"].get("project_id", "")
+if "placeholder" in proj:
+    print(f"❌ google-services.json still uses placeholder project '{proj}' — upload the real file")
+    sys.exit(1)
+print(f"✅ google-services.json OK  project_id={proj}")
+PYEOF
 
       - name: Build APK (release)
         run: flutter build apk --release
@@ -151,6 +171,22 @@ jobs:
           releaseNotes: |
             版本：${{ github.ref_name }}
             Commit：${{ github.sha }}
+
+  # ─── Firebase Hosting Deploy（隱私政策頁面）──────────────────
+  deploy-hosting:
+    name: Deploy Hosting (Privacy Policy)
+    runs-on: ubuntu-latest
+    needs: android-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Firebase Hosting
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only hosting
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 
   # ─── iOS Build（暫停：待取得 Apple Developer 帳號後啟用）────
   # ios-build:
