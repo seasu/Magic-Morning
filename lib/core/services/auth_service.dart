@@ -135,10 +135,13 @@ class AuthService {
   /// 增加點數（看廣告 / 登入獎勵後呼叫）
   static Future<void> addCredits(String uid, int amount) async {
     try {
-      await _userDoc(uid).update({
-        'credits': FieldValue.increment(amount),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await _userDoc(uid).set(
+        {
+          'credits': FieldValue.increment(amount),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'add_credits_failed');
     }
