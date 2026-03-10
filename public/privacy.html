@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>隱私政策 — Magic Sticker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC",
+                   "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: #f8f9fa;
+      color: #212529;
+      line-height: 1.8;
+    }
+
+    header {
+      background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
+      color: #fff;
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+    header .icon { font-size: 48px; margin-bottom: 12px; }
+    header h1 { font-size: 1.8rem; font-weight: 700; }
+    header p  { font-size: 0.95rem; opacity: 0.85; margin-top: 8px; }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #6c63ff;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #ede9fe;
+    }
+
+    p  { margin-bottom: 12px; font-size: 0.95rem; color: #495057; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    li { font-size: 0.95rem; color: #495057; margin-bottom: 6px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin-top: 8px;
+    }
+    th {
+      background: #f3f0ff;
+      color: #5b21b6;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; color: #495057; }
+    tr:last-child td { border-bottom: none; }
+
+    .tag {
+      display: inline-block;
+      background: #ede9fe;
+      color: #5b21b6;
+      border-radius: 99px;
+      padding: 2px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .highlight {
+      background: #fefce8;
+      border-left: 4px solid #fbbf24;
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.9rem;
+      color: #92400e;
+      margin: 16px 0;
+    }
+
+    .contact-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 20px 24px;
+      text-align: center;
+    }
+    .contact-box a {
+      color: #16a34a;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .contact-box a:hover { text-decoration: underline; }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.82rem;
+      color: #adb5bd;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="icon">🔒</div>
+  <h1>隱私政策</h1>
+  <p>Magic Sticker — AI 一鍵貼圖生成器<br>最後更新：2026 年 3 月 10 日</p>
+</header>
+
+<main>
+
+  <!-- 概覽 -->
+  <div class="card">
+    <h2>概覽</h2>
+    <p>
+      Magic Sticker（以下簡稱「本應用程式」）由個人開發者提供。
+      本政策說明當您使用本應用程式時，我們如何蒐集、使用及保護您的資料。
+    </p>
+    <div class="highlight">
+      📌 本應用程式<strong>不</strong>會將您的照片上傳至任何自行維護的伺服器，
+      亦<strong>不</strong>會將照片分享給第三方用於廣告目的。
+    </div>
+  </div>
+
+  <!-- 蒐集的資料 -->
+  <div class="card">
+    <h2>我們蒐集哪些資料</h2>
+    <table>
+      <thead>
+        <tr><th>資料類型</th><th>用途</th><th>是否儲存</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>匿名使用者 ID <span class="tag">Firebase</span></td>
+          <td>識別帳號、管理點數</td>
+          <td>是（Firestore）</td>
+        </tr>
+        <tr>
+          <td>Google / Apple 帳號資訊</td>
+          <td>登入後升級帳號、增加點數</td>
+          <td>僅 UID 與 Email</td>
+        </tr>
+        <tr>
+          <td>照片 / 圖片</td>
+          <td>傳送給 Gemini AI 生成貼圖</td>
+          <td>否（不儲存於伺服器）</td>
+        </tr>
+        <tr>
+          <td>應用程式互動記錄 <span class="tag">Analytics</span></td>
+          <td>了解功能使用情況、改善體驗</td>
+          <td>是（Firebase）</td>
+        </tr>
+        <tr>
+          <td>崩潰與錯誤日誌 <span class="tag">Crashlytics</span></td>
+          <td>偵錯、提升穩定性</td>
+          <td>是（Firebase）</td>
+        </tr>
+        <tr>
+          <td>廣告識別碼 <span class="tag">AdMob</span></td>
+          <td>投放廣告（看廣告換點數）</td>
+          <td>由 Google 管理</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 照片使用說明 -->
+  <div class="card">
+    <h2>照片如何被使用</h2>
+    <p>您選取或拍攝的照片僅用於以下流程：</p>
+    <ul>
+      <li>在裝置端壓縮至 ≤ 1080px（降低傳輸量）</li>
+      <li>以加密連線（HTTPS）傳送至 <strong>Firebase Cloud Functions</strong></li>
+      <li>由 Cloud Functions 轉送至 <strong>Google Gemini AI</strong> 生成卡通貼圖</li>
+      <li>生成完成後，圖片資料<strong>立即釋放，不作任何儲存或紀錄</strong></li>
+    </ul>
+    <p>本應用程式的 Gemini API 金鑰完全存放於 Firebase Cloud Functions 環境，
+       <strong>不包含在 App 安裝檔中</strong>，無法被反編譯取得。</p>
+  </div>
+
+  <!-- 第三方服務 -->
+  <div class="card">
+    <h2>第三方服務</h2>
+    <p>本應用程式使用以下 Google / Apple 服務，各服務均有其獨立隱私政策：</p>
+    <ul>
+      <li>
+        <strong>Firebase（Google）</strong> — 身份驗證、Firestore 資料庫、Crashlytics、Analytics<br>
+        <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">
+          firebase.google.com/support/privacy
+        </a>
+      </li>
+      <li>
+        <strong>Google Gemini AI</strong> — AI 貼圖生成<br>
+        <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">
+          ai.google.dev/gemini-api/terms
+        </a>
+      </li>
+      <li>
+        <strong>Google AdMob</strong> — 廣告投放（看廣告換點數）<br>
+        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">
+          policies.google.com/privacy
+        </a>
+      </li>
+      <li>
+        <strong>Google Sign-In / Sign in with Apple</strong> — 第三方登入<br>
+        Google：<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>
+        　Apple：<a href="https://www.apple.com/legal/privacy/tw/" target="_blank" rel="noopener">apple.com/legal/privacy/tw</a>
+      </li>
+    </ul>
+  </div>
+
+  <!-- 兒童隱私 -->
+  <div class="card">
+    <h2>兒童隱私</h2>
+    <p>
+      本應用程式並非針對 13 歲以下兒童設計。
+      我們不會故意蒐集兒童的個人資料。
+      若您發現您的子女在未經授權的情況下提供了個人資料，請聯絡我們，我們將立即刪除相關資料。
+    </p>
+  </div>
+
+  <!-- 資料保留與刪除 -->
+  <div class="card">
+    <h2>資料保留與刪除</h2>
+    <ul>
+      <li>您的帳號資料（UID、點數紀錄）保留至您主動刪除帳號為止</li>
+      <li>Firebase Analytics / Crashlytics 資料依 Google 預設保留政策處理（最長 14 個月）</li>
+      <li>如需刪除帳號資料，請透過下方聯絡方式告知，我們將於 30 個工作天內完成刪除</li>
+    </ul>
+  </div>
+
+  <!-- 您的權利 -->
+  <div class="card">
+    <h2>您的權利</h2>
+    <p>依據適用法律，您享有以下權利：</p>
+    <ul>
+      <li>查詢我們持有哪些關於您的資料</li>
+      <li>要求更正不正確的資料</li>
+      <li>要求刪除您的資料</li>
+      <li>撤回同意（撤回後部分功能可能無法使用）</li>
+    </ul>
+  </div>
+
+  <!-- 隱私政策更新 -->
+  <div class="card">
+    <h2>隱私政策更新</h2>
+    <p>
+      我們可能不定期更新本隱私政策。更新時將修改頁面頂端的「最後更新」日期。
+      建議您定期查看本頁面以了解最新內容。
+      繼續使用本應用程式視為接受更新後的政策。
+    </p>
+  </div>
+
+  <!-- 聯絡我們 -->
+  <div class="card">
+    <h2>聯絡我們</h2>
+    <p>如對本隱私政策有任何疑問，請透過以下方式聯絡開發者：</p>
+    <div class="contact-box">
+      📧 <a href="mailto:contact@magic-sticker.app">contact@magic-sticker.app</a>
+      <p style="margin-top:8px;font-size:0.85rem;color:#6b7280;">
+        我們通常在 3 個工作天內回覆
+      </p>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  &copy; 2026 Magic Sticker. All rights reserved.
+</footer>
+
+</body>
+</html>
