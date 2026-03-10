@@ -15,6 +15,13 @@ if (localPropertiesFile.exists()) {
 def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "1"
 def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.0"
 
+// 從 key.properties 讀取簽名設定（由 GitHub Actions 於 CI 時產生，本地不存在）
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader("UTF-8") { reader -> keystoreProperties.load(reader) }
+}
+
 android {
     namespace "com.magicsticker.magic_sticker"
     compileSdk flutter.compileSdkVersion
@@ -29,6 +36,15 @@ android {
         jvmTarget = "11"
     }
 
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
     defaultConfig {
         applicationId "com.magicsticker.magic_sticker"
         minSdk 26  // Android 8.0+，ML Kit Subject Segmentation 需求
@@ -41,7 +57,7 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            signingConfig signingConfigs.debug // CI 時由 GitHub Actions 替換
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
             firebaseCrashlytics {
                 mappingFileUploadEnabled true
                 nativeSymbolUploadEnabled false
