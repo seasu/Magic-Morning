@@ -30,7 +30,12 @@ jobs:
       - name: Write google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_ANDROID }}
-        run: printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "ERROR: GOOGLE_SERVICES_JSON_ANDROID secret is not set"
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
       - name: Build APK (release)
         run: flutter build apk --release
