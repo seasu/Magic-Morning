@@ -41,6 +41,26 @@ jobs:
           printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
           python3 -c "import json,sys; d=json.load(open('android/app/google-services.json')); assert 'project_info' in d, 'missing project_info'; p=d['project_info'].get('project_id',''); assert 'placeholder' not in p, 'placeholder project: '+p; print('OK project_id='+p)"
 
+      - name: Setup Android Release Signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "⚠️ WARNING: ANDROID_KEYSTORE_BASE64 not set, using debug signing"
+          else
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+            cat > android/key.properties <<EOF
+          storePassword=${STORE_PASSWORD}
+          keyPassword=${KEY_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          storeFile=../upload-keystore.jks
+          EOF
+            echo "✅ Release keystore configured"
+          fi
+
       - name: Build APK (release)
         run: flutter build apk --release
 
