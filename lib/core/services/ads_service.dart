@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -31,6 +32,7 @@ class AdsService {
 
   RewardedAd? _rewardedAd;
   bool _isLoading = false;
+  Completer<void>? _adCompleter;
 
   bool get isAdReady => _rewardedAd != null;
 
@@ -66,12 +68,16 @@ class AdsService {
               ad.dispose();
               _rewardedAd = null;
               loadRewardedAd(); // 關掉後立即預載下一則
+              _adCompleter?.complete();
+              _adCompleter = null;
             },
             onAdFailedToShowFullScreenContent: (ad, error) {
               ad.dispose();
               _rewardedAd = null;
               loadRewardedAd();
               FirebaseService.log('AdsService: ad failed to show: $error');
+              _adCompleter?.complete();
+              _adCompleter = null;
             },
           );
         },
@@ -102,6 +108,8 @@ class AdsService {
       return;
     }
 
+    _adCompleter = Completer<void>();
+
     try {
       await _rewardedAd!.show(
         onUserEarnedReward: (_, reward) {
@@ -111,8 +119,12 @@ class AdsService {
           onRewarded();
         },
       );
+      // 等廣告關閉後才 return，確保 _watchAd 的 rewarded 旗標已被設置
+      await (_adCompleter?.future ?? Future.value());
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'ads_show_failed');
+      _adCompleter?.complete();
+      _adCompleter = null;
       onFailed?.call();
     }
   }
