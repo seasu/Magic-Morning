@@ -297,3 +297,15 @@ export const generateStickerImage = onCall(
     throw new HttpsError("internal", "No image returned by Gemini.");
   }
 );
+
+// ── getConfig ────────────────────────────────────────────────────────────────
+//
+// Debug 用：回傳目前部署的 model 設定（不需 Auth）
+
+export const getConfig = onCall(
+  {region: "asia-east1", timeoutSeconds: 10, memory: "128MiB"},
+  () => ({
+    textModel: geminiTextModel.value(),
+    imageModel: geminiImageModel.value(),
+  })
+);

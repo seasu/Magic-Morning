@@ -1,11 +1,9 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/services/log_service.dart';
-
-const _kSpecsModel = 'gemini-2.0-flash-lite';
-const _kImageModel = 'gemini-2.5-flash-preview-05-20';
 
 class LogViewerScreen extends StatefulWidget {
   const LogViewerScreen({super.key});
@@ -348,8 +346,45 @@ class _LogTile extends StatelessWidget {
 
 // ── Model 資訊卡 ──────────────────────────────────────────────────────────
 
-class _ModelInfoCard extends StatelessWidget {
+class _ModelInfoCard extends StatefulWidget {
   const _ModelInfoCard();
+
+  @override
+  State<_ModelInfoCard> createState() => _ModelInfoCardState();
+}
+
+class _ModelInfoCardState extends State<_ModelInfoCard> {
+  String? _textModel;
+  String? _imageModel;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchConfig();
+  }
+
+  Future<void> _fetchConfig() async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-east1')
+          .httpsCallable('getConfig');
+      final result = await callable.call<Map<String, dynamic>>();
+      final data = result.data;
+      if (!mounted) return;
+      setState(() {
+        _textModel = data['textModel'] as String?;
+        _imageModel = data['imageModel'] as String?;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -372,7 +407,7 @@ class _ModelInfoCard extends StatelessWidget {
               Icon(Icons.smart_toy_outlined, size: 16, color: cs.primary),
               const SizedBox(width: 6),
               Text(
-                'Gemini Models',
+                'Gemini Models (Cloud Functions)',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -394,9 +429,51 @@ class _ModelInfoCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          _modelRow(context, 'Specs（文字）', _kSpecsModel),
-          const SizedBox(height: 4),
-          _modelRow(context, 'Image（圖片）', _kImageModel),
+          if (_loading)
+            Row(
+              children: [
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: cs.outline,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '從 Cloud Functions 取得中...',
+                  style: TextStyle(fontSize: 11, color: cs.outline),
+                ),
+              ],
+            )
+          else if (_error != null)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _loading = true;
+                  _error = null;
+                });
+                _fetchConfig();
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 14, color: cs.error),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '無法取得（點擊重試）',
+                      style: TextStyle(fontSize: 11, color: cs.error),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            _modelRow(context, 'Text', _textModel ?? '—'),
+            const SizedBox(height: 4),
+            _modelRow(context, 'Image', _imageModel ?? '—'),
+          ],
         ],
       ),
     );
@@ -407,10 +484,14 @@ class _ModelInfoCard extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 90,
+          width: 50,
           child: Text(
             label,
-            style: TextStyle(fontSize: 11, color: cs.outline),
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.outline,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         Expanded(
