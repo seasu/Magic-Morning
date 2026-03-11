@@ -503,7 +503,7 @@ class _CardStack extends StatelessWidget {
 
               // ── 生成中 badge ──────────────────────────────────────────
               if (state.generatedImages[currentIndex] == null)
-                Positioned(
+                const Positioned(
                   top: 8,
                   child: _StatusBadge.loading(),
                 ),
@@ -771,75 +771,10 @@ class _FailedOverlay extends StatelessWidget {
 // ─── AI 狀態 Badge ────────────────────────────────────────────────────────────
 
 class _StatusBadge extends StatelessWidget {
-  final bool isFailed;
-  final String? reason;
-  final VoidCallback? onRetry;
-
-  const _StatusBadge.loading()
-      : isFailed = false,
-        reason = null,
-        onRetry = null;
-
-  const _StatusBadge.failed({this.reason, this.onRetry}) : isFailed = true;
+  const _StatusBadge.loading();
 
   @override
   Widget build(BuildContext context) {
-    if (isFailed) {
-      return GestureDetector(
-        onTap: () {
-          HapticFeedback.mediumImpact();
-          onRetry?.call();
-        },
-        onLongPress: reason == null
-            ? null
-            : () => showDialog<void>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('API 錯誤詳情'),
-                    content: SingleChildScrollView(
-                        child: SelectableText(reason!)),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('關閉'),
-                      ),
-                    ],
-                  ),
-                ),
-        child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.red.shade600,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.red.withValues(alpha: 0.35),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, size: 13, color: Colors.white),
-              SizedBox(width: 5),
-              Text(
-                'AI 生成失敗，點此重試',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600),
-              ),
-              SizedBox(width: 5),
-              Icon(Icons.refresh, size: 13, color: Colors.white),
-            ],
-          ),
-        ),
-      );
-    }
-
     return const _CatChaseMiniBadge();
   }
 }

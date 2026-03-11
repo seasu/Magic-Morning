@@ -60,7 +60,7 @@ class _GuestBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.person_outline_rounded,
+            const Icon(Icons.person_outline_rounded,
                 size: 13, color: AppColors.textSecondary),
             const SizedBox(width: 3),
             Text(
@@ -72,7 +72,7 @@ class _GuestBadge extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 3),
-            Icon(Icons.keyboard_arrow_down_rounded,
+            const Icon(Icons.keyboard_arrow_down_rounded,
                 size: 14, color: AppColors.textSecondary),
           ],
         ),

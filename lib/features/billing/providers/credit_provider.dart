@@ -77,7 +77,7 @@ class CreditNotifier extends Notifier<int> {
     final success = await AuthService.consumeCredit(uid);
     if (success) {
       state = state - 1;
-      FirebaseService.log('CreditProvider: consumed 1 → remaining ${state}');
+      FirebaseService.log('CreditProvider: consumed 1 → remaining $state');
     }
     return success;
   }
@@ -92,7 +92,7 @@ class CreditNotifier extends Notifier<int> {
 
     await AuthService.addCredits(uid, amount, reason: reason);
     state = state + amount;
-    FirebaseService.log('CreditProvider: +$amount → total ${state}');
+    FirebaseService.log('CreditProvider: +$amount → total $state');
   }
 
   /// Cloud Function 回傳的最新點數直接寫入（免去一次 Firestore 讀取）
