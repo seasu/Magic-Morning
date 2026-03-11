@@ -2,34 +2,39 @@
 
 ## Cursor Cloud specific instructions
 
-### Overview
+### Project overview
 
-MagicMorning (Magic Sticker) is a Flutter mobile app (Android-first, iOS Phase 2) with Firebase Cloud Functions backend. Two components need dev tooling:
+Magic Sticker (package: `magic_sticker`) — an AI-powered LINE sticker generator Flutter app (Android only, no iOS directory) with Firebase Cloud Functions backend. See `CLAUDE.md` for full development rules and `PRD.md` for product specs.
 
-| Component | Path | Language | Dev commands |
-|---|---|---|---|
-| Flutter App | `/workspace` | Dart | See `README.md` "快速開始" section |
-| Cloud Functions | `/workspace/functions/` | TypeScript (Node 22) | `npm run build` / `npm run lint` |
+| Component | Path | Language |
+|---|---|---|
+| Flutter App | `/workspace` | Dart |
+| Cloud Functions | `/workspace/functions/` | TypeScript (Node 22) |
 
-### Environment
+### SDK locations
 
-- **Flutter SDK**: installed at `/opt/flutter` (v3.29.1), already on `PATH` via `~/.bashrc`
-- **Android SDK**: installed at `$HOME/android-sdk`, configured via `flutter config --android-sdk`
-- **Node.js 22** + npm: pre-installed on the VM
-- **Java 21**: pre-installed on the VM
+- **Flutter SDK**: `/opt/flutter/bin/flutter` (v3.29.1, Dart 3.7.0)
+- **Android SDK**: `/home/ubuntu/android-sdk`
+- **Node.js 22** + npm, **Java 21**: pre-installed on the VM
+- All on `PATH` via `~/.bashrc`.
 
 ### Key commands
 
-- **Lint (Flutter)**: `dart analyze --fatal-infos` — must pass before every commit (see `CLAUDE.md` checklist and `.claude/skills/flutter-ci-guard/SKILL.md`)
-- **Test (Flutter)**: `flutter test`
-- **Build APK**: `flutter build apk --debug`
-- **Cloud Functions build**: `cd functions && npm run build`
-- **Cloud Functions lint**: `cd functions && npm run lint` — note: `.eslintrc` config is not committed; ESLint will fail until the config file is added
+| Task | Command |
+|---|---|
+| Install deps | `flutter pub get` |
+| Lint | `dart analyze --fatal-infos` (must pass before every commit) |
+| Tests | `flutter test` |
+| Build debug APK | `flutter build apk --debug` |
+| Build release APK | `flutter build apk --release` (needs signing config) |
+| Cloud Functions deps | `cd functions && npm install` |
+| Cloud Functions type-check | `cd functions && npx tsc --noEmit` |
 
 ### Gotchas
 
-- The first `flutter build apk` on a clean VM takes ~12 minutes because Gradle downloads dependencies and Android SDK auto-installs NDK/CMake/platform packages. Subsequent builds are much faster.
-- `google-services.json` is present in the repo at `android/app/google-services.json` (placeholder project). For real Firebase features, replace with your own.
-- `CLAUDE.md` mandates bumping `pubspec.yaml` version and updating `PRD.md` before every commit. Follow this rule.
-- Linux desktop toolchain is not set up (ninja, GTK3 missing) — this is fine; the app targets Android/iOS only.
-- The `functions/` ESLint config (`.eslintrc.js` or similar) is not committed to the repo; `npm run lint` will fail. TypeScript compilation (`npm run build` / `tsc`) works fine.
+- **CLAUDE.md rules**: Before any commit, you must (1) bump `version` in `pubspec.yaml` and (2) update `PRD.md`. See `CLAUDE.md` for the full checklist.
+- **Web mode does not work**: The app depends on Firebase, AdMob, and ML Kit native plugins. Running via `flutter run -d chrome` will show a blank screen. Only Android builds are meaningful.
+- **Firebase config has placeholders**: `lib/core/services/firebase_options.dart` contains `YOUR_ANDROID_API_KEY` placeholders. The app handles Firebase init failures gracefully, so builds and tests still pass.
+- **First Android build is slow** (~10-12 min) because Gradle downloads dependencies and the Android SDK auto-installs NDK/CMake/platform packages. Subsequent builds are much faster.
+- **No signing key in dev**: Release builds fall back to debug signing when `android/key.properties` is absent. CI uses GitHub Secrets for release signing.
+- **ESLint not configured**: `functions/` ESLint config is not committed; `npm run lint` will fail. TypeScript compilation (`npx tsc --noEmit`) works fine.

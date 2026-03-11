@@ -106,17 +106,18 @@ def load_source_image() -> bytes:
 
 
 def generate_with_gemini_flash(api_key: str, style_key: str, style_info: dict, source_bytes: bytes) -> bytes | None:
-    """使用 Gemini 2.0 Flash (image generation) 產生風格圖。"""
+    """使用 Gemini image generation 產生風格圖。"""
     try:
         from google import genai
         from google.genai import types
 
+        image_model = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-preview-05-20")
         client = genai.Client(api_key=api_key)
 
         source_b64 = base64.b64encode(source_bytes).decode()
 
         response = client.models.generate_content(
-            model="gemini-2.0-flash-preview-image-generation",
+            model=image_model,
             contents=[
                 types.Content(
                     role="user",

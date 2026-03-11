@@ -1,5 +1,7 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/services/log_service.dart';
 
@@ -115,6 +117,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
 
       body: Column(
         children: [
+          // ── Model 資訊 ──────────────────────────────────────────────────────
+          const _ModelInfoCard(),
+
           // ── 篩選列 ─────────────────────────────────────────────────────────
           _FilterBar(
             current: _filter,
@@ -335,6 +340,184 @@ class _LogTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Model 資訊卡 ──────────────────────────────────────────────────────────
+
+class _ModelInfoCard extends StatefulWidget {
+  const _ModelInfoCard();
+
+  @override
+  State<_ModelInfoCard> createState() => _ModelInfoCardState();
+}
+
+class _ModelInfoCardState extends State<_ModelInfoCard> {
+  String? _textModel;
+  String? _imageModel;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchConfig();
+  }
+
+  Future<void> _fetchConfig() async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-east1')
+          .httpsCallable('getConfig');
+      final result = await callable.call<Map<String, dynamic>>();
+      final data = result.data;
+      if (!mounted) return;
+      setState(() {
+        _textModel = data['textModel'] as String?;
+        _imageModel = data['imageModel'] as String?;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.smart_toy_outlined, size: 16, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Gemini Models (Cloud Functions)',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: cs.primary,
+                ),
+              ),
+              const Spacer(),
+              FutureBuilder<PackageInfo>(
+                future: PackageInfo.fromPlatform(),
+                builder: (_, snap) {
+                  final v = snap.data;
+                  if (v == null) return const SizedBox.shrink();
+                  return Text(
+                    'v${v.version}+${v.buildNumber}',
+                    style: TextStyle(fontSize: 11, color: cs.outline),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_loading)
+            Row(
+              children: [
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: cs.outline,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '從 Cloud Functions 取得中...',
+                  style: TextStyle(fontSize: 11, color: cs.outline),
+                ),
+              ],
+            )
+          else if (_error != null)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _loading = true;
+                  _error = null;
+                });
+                _fetchConfig();
+              },
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 14, color: cs.error),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '無法取得（點擊重試）',
+                      style: TextStyle(fontSize: 11, color: cs.error),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            _modelRow(context, 'Text', _textModel ?? '—'),
+            const SizedBox(height: 4),
+            _modelRow(context, 'Image', _imageModel ?? '—'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _modelRow(BuildContext context, String label, String model) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        SizedBox(
+          width: 50,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.outline,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(
+          child: GestureDetector(
+            onLongPress: () {
+              Clipboard.setData(ClipboardData(text: model));
+              ScaffoldMessenger.of(context)
+                ..clearSnackBars()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text('已複製 $model'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+            },
+            child: Text(
+              model,
+              style: const TextStyle(
+                fontSize: 12,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
