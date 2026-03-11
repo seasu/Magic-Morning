@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | MagicMorning（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v3.1.18+139 |
+| 目前版本 | v3.1.25+146 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash Exp Image Generation（圖片生成）|
@@ -207,6 +207,13 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.25 | 2026-03-11 | **CI/CD**：deploy-functions job 在部署前從 GitHub Variables（`GEMINI_TEXT_MODEL` / `GEMINI_IMAGE_MODEL`）產生 `functions/.env`；`.gitignore` 加入 `functions/.env` |
+| v3.1.24 | 2026-03-11 | **feat**：新增 `getConfig` Cloud Function（回傳目前部署的 text/image model name）；debug 畫面改為即時從 Cloud Functions 拉取顯示，取代硬編碼常數 |
+| v3.1.23 | 2026-03-11 | **重構**：Cloud Functions 的 Gemini text model（`GEMINI_TEXT_MODEL`）和 image model（`GEMINI_IMAGE_MODEL`）改用 `defineString` 參數化，可在 Firebase Console 或 `functions/.env` 直接修改，無需改 code 重新部署 |
+| v3.1.22 | 2026-03-11 | **feat(dev-log)**：debug 畫面頂部新增 Gemini Models 資訊卡，顯示 Specs/Image 兩個 model name 及 App 版號；長按 model name 可複製 |
+| v3.1.21 | 2026-03-11 | **重構**：Gemini image model name 從硬編碼改為讀取 `GEMINI_IMAGE_MODEL` 環境變數（fallback `gemini-2.5-flash-preview-05-20`）；workflow 從 GitHub Variable `vars.GEMINI_IMAGE_MODEL` 注入，日後換 model 只需在 GitHub Settings → Variables 修改，無需改 code |
+| v3.1.20 | 2026-03-11 | **CI fix**：3 支 Python 腳本的 Gemini image model 統一改為 `gemini-2.5-flash-preview-05-20`（與 Cloud Functions 一致），修正 `generate_style_previews_ci.py` 404 NOT_FOUND |
+| v3.1.19 | 2026-03-11 | **CI fix**：修正 `dart analyze --fatal-infos` 的 33 個 info/warning：移除未使用的 `_StatusBadge.failed`、補齊 `const` 建構子、修正 `curly_braces_in_flow_control_structures`、`unnecessary_brace_in_string_interps`、`library_private_types_in_public_api` |
 | v3.1.18 | 2026-03-11 | **Merge fix**：合併 main 分支，`_promoteUser` 採用 Cloud Functions 專責寫入 `creditHistory` 的架構（移除客戶端 `_writeCreditHistory` 呼叫），避免 Firestore `permission-denied` |
 | v3.1.16 | 2026-03-11 | **UI/UX fix**：EditorScreen 生成失敗狀態三項修正：(1) 底部按鈕邏輯修正——失敗（`Uint8List(0)`）時改顯示「生成·1點」而非「儲存貼圖」，避免 token 時序混淆；(2) `_accept()` 新增失敗狀態 guard，防止匯出空白圖；(3) 錯誤提示從頂部小 badge 改為全卡片居中大型覆蓋層（`_FailedOverlay`），文字 24sp+加粗+重試按鈕，視覺更清晰 |
 | v3.1.15 | 2026-03-11 | **Bug fix**：(a) 修正 `StickerGenerationService` 在 `unauthenticated` 錯誤時的 retry 無效問題，改用 `user.getIdToken(true)` 強制刷新 ID token；(b) 移除 `AuthService` 中所有從客戶端寫入 `creditHistory` 的呼叫，`creditHistory` 寫入僅由 Cloud Functions 處理；新增 `ensure_user_doc_failed` 獨立 Crashlytics 錯誤標籤 |
