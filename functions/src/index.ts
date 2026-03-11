@@ -1,11 +1,19 @@
 import * as admin from "firebase-admin";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {defineSecret} from "firebase-functions/params";
+import {defineSecret, defineString} from "firebase-functions/params";
 
 admin.initializeApp();
 
 const db = admin.firestore();
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
+const geminiTextModel = defineString("GEMINI_TEXT_MODEL", {
+  default: "gemini-2.0-flash-lite",
+  description: "Gemini model for text/specs generation",
+});
+const geminiImageModel = defineString("GEMINI_IMAGE_MODEL", {
+  default: "gemini-2.5-flash-preview-05-20",
+  description: "Gemini model for image generation",
+});
 
 // ── creditHistory helper ─────────────────────────────────────────────────────
 
@@ -55,9 +63,10 @@ export const generateStickerSpecs = onCall(
 
     // ── 呼叫 Gemini 文字 API ────────────────────────────────────────────────
     const apiKey = geminiApiKey.value();
+    const textModel = geminiTextModel.value();
     const endpoint =
       "https://generativelanguage.googleapis.com/v1beta" +
-      `/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
+      `/models/${textModel}:generateContent?key=${apiKey}`;
 
     const body = {
       contents: [
@@ -185,9 +194,10 @@ export const generateStickerImage = onCall(
 
     // ── 呼叫 Gemini Image API ────────────────────────────────────────────────
     const apiKey = geminiApiKey.value();
+    const imgModel = geminiImageModel.value();
     const endpoint =
       "https://generativelanguage.googleapis.com/v1beta" +
-      `/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+      `/models/${imgModel}:generateContent?key=${apiKey}`;
 
     const body = {
       contents: [
