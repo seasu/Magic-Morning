@@ -24,11 +24,9 @@ class GeminiService {
 
   /// 呼叫 Cloud Function `generateStickerSpecs`。
   ///
-  /// 回傳 [specs, remainingCredits]；
-  /// 若 Cloud Function 回傳 resource-exhausted，代表點數不足，直接 rethrow。
-  /// 其他錯誤回傳 fallback specs，remainingCredits = -1。
-  Future<({List<StickerSpec> specs, int remainingCredits})>
-      generateStickerSpecs(Uint8List imageBytes) async {
+  /// Spec 預覽免費，不扣點。
+  /// 失敗時回傳 fallback specs，確保使用者仍能看到預覽。
+  Future<List<StickerSpec>> generateStickerSpecs(Uint8List imageBytes) async {
     FirebaseService.log('GeminiService.generateStickerSpecs: start');
 
     try {
@@ -44,14 +42,11 @@ class GeminiService {
       final data = result.data;
       final rawSpecs = (data['specs'] as List).cast<Map<String, dynamic>>();
       final specs = rawSpecs.take(8).map(StickerSpec.fromJson).toList();
-      final remaining = (data['remainingCredits'] as num).toInt();
 
-      FirebaseService.log(
-        'GeminiService.generateStickerSpecs: done, remainingCredits=$remaining',
-      );
+      FirebaseService.log('GeminiService.generateStickerSpecs: done');
       await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_generated');
 
-      return (specs: specs, remainingCredits: remaining);
+      return specs;
     } on FirebaseFunctionsException catch (e, stack) {
       FirebaseService.log(
         'GeminiService: Cloud Function error code=${e.code} msg=${e.message}',
@@ -59,23 +54,14 @@ class GeminiService {
       await FirebaseService.recordError(
         e, stack, reason: 'gemini_specs_fn_failed',
       );
-      if (e.code == 'resource-exhausted') {
-        rethrow; // 點數不足，讓 editor_provider 顯示 paywall
-      }
       await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_fallback');
-      return (
-        specs: _kFallbackSpecs.map(StickerSpec.fromJson).toList(),
-        remainingCredits: -1,
-      );
+      return _kFallbackSpecs.map(StickerSpec.fromJson).toList();
     } catch (e, stack) {
       await FirebaseService.recordError(
         e, stack, reason: 'gemini_specs_unexpected_failed',
       );
       await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_fallback');
-      return (
-        specs: _kFallbackSpecs.map(StickerSpec.fromJson).toList(),
-        remainingCredits: -1,
-      );
+      return _kFallbackSpecs.map(StickerSpec.fromJson).toList();
     }
   }
 }

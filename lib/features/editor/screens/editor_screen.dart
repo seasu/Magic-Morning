@@ -69,6 +69,15 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   // ─── Actions ──────────────────────────────────────────────────────────────
 
   Future<void> _accept() async {
+    // 若圖片尚未生成，先觸發生成
+    final state = ref.read(editorStateProvider(widget.imagePath));
+    if (isNotGeneratedSentinel(state.generatedImages[_currentIndex])) {
+      await _generateImage(_currentIndex);
+      return;
+    }
+    // 圖片仍在生成中，忽略
+    if (state.generatedImages[_currentIndex] == null) return;
+
     FirebaseService.log('EditorScreen._accept: sticker ${_currentIndex + 1}');
     setState(() => _isExporting = true);
     try {
@@ -252,21 +261,36 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   }
 
   Future<void> _regenerate() async {
-    // 重新生成需要消耗 1 點
-    final credits = ref.read(creditProvider);
-    if (credits <= 0) {
-      FirebaseService.log('EditorScreen._regenerate: no credits → showing paywall');
-      if (!mounted) return;
-      final earned = await CreditPaywallDialog.show(context, ref);
-      if (!earned || !mounted) return;
-    }
-
-    // 點數由 Cloud Function (generateStickerSpecs) 原子性扣除
+    // Spec 免費，直接重新生成文字規格
     setState(() {
       _currentIndex = 0;
       _keptCount = 0;
     });
     ref.read(editorStateProvider(widget.imagePath).notifier).regenerateTexts();
+  }
+
+  /// 使用者點擊「生成」按鈕，消耗 1 點產生圖片
+  Future<void> _generateImage(int index) async {
+    final credits = ref.read(creditProvider);
+    if (credits <= 0) {
+      FirebaseService.log('EditorScreen._generateImage: no credits → showing paywall');
+      if (!mounted) return;
+      final earned = await CreditPaywallDialog.show(context, ref);
+      if (!earned || !mounted) return;
+    }
+
+    final result = await ref
+        .read(editorStateProvider(widget.imagePath).notifier)
+        .generateSingleImage(index);
+
+    if (result == 'insufficient' && mounted) {
+      final earned = await CreditPaywallDialog.show(context, ref);
+      if (earned && mounted) {
+        await ref
+            .read(editorStateProvider(widget.imagePath).notifier)
+            .generateSingleImage(index);
+      }
+    }
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
@@ -279,7 +303,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final isReady = state.status == EditorStatus.ready;
     final isDone = isReady && _currentIndex >= 8;
 
-    // 當前張 AI 圖片仍在生成中（null = loading）→ 全畫面 loading 遮罩
+    // 當前張 AI 圖片仍在生成中（null = loading，sentinel = 尚未觸發生成）
     final isCurrentImageLoading = isReady &&
         !isDone &&
         state.generatedImages[_currentIndex] == null;
@@ -325,10 +349,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                       onAccepted: _accept,
                       onRejected: _reject,
                       onEdit: _openEditSheet,
-                      onRetry: () => ref
-                          .read(
-                              editorStateProvider(widget.imagePath).notifier)
-                          .retryImageGeneration(_currentIndex),
+                      onGenerate: () => _generateImage(_currentIndex),
+                      onRetry: () => _generateImage(_currentIndex),
                       stickerShape: state.stickerShape,
                     ),
                   ),
@@ -453,6 +475,7 @@ class _CardStack extends StatelessWidget {
   final VoidCallback onAccepted;
   final VoidCallback onRejected;
   final VoidCallback onEdit;
+  final VoidCallback? onGenerate;
   final VoidCallback? onRetry;
   final StickerShape stickerShape;
 
@@ -464,6 +487,7 @@ class _CardStack extends StatelessWidget {
     required this.onAccepted,
     required this.onRejected,
     required this.onEdit,
+    this.onGenerate,
     this.onRetry,
     this.stickerShape = StickerShape.circle,
   });
@@ -550,6 +574,13 @@ class _CardStack extends StatelessWidget {
                 onTap: onEdit,
                 stickerShape: stickerShape,
               ),
+              // ── 尚未生成：顯示「生成」按鈕 ───────────────────────────
+              if (isNotGeneratedSentinel(state.generatedImages[currentIndex]))
+                Positioned(
+                  bottom: 16,
+                  child: _GenerateButton(onTap: onGenerate),
+                ),
+
               // ── 生成中 badge ──────────────────────────────────────────
               if (state.generatedImages[currentIndex] == null)
                 Positioned(
@@ -787,6 +818,52 @@ class _StatusBadge extends StatelessWidget {
     }
 
     return const _CatChaseMiniBadge();
+  }
+}
+
+// ─── 生成按鈕（尚未觸發生成）────────────────────────────────────────────────
+
+class _GenerateButton extends StatelessWidget {
+  final VoidCallback? onTap;
+  const _GenerateButton({this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        onTap?.call();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: AppColors.gradient,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
+            SizedBox(width: 6),
+            Text(
+              '生成 · 1點',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

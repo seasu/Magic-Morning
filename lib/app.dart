@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/models/sticker_shape.dart';
 import 'core/theme/app_theme.dart';
+import 'features/billing/screens/credit_history_screen.dart';
 import 'features/dev_log/screens/log_viewer_screen.dart';
 import 'features/editor/screens/editor_screen.dart';
 import 'features/home/screens/home_screen.dart';
@@ -37,6 +38,10 @@ final _router = GoRouter(
           stickerShape: args.stickerShape,
         );
       },
+    ),
+    GoRoute(
+      path: '/credit-history',
+      builder: (_, __) => const CreditHistoryScreen(),
     ),
     GoRoute(
       path: '/dev-log',

@@ -7,12 +7,33 @@ admin.initializeApp();
 const db = admin.firestore();
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
+// ── creditHistory helper ─────────────────────────────────────────────────────
+
+function writeCreditHistory(
+  tx: admin.firestore.Transaction,
+  uid: string,
+  entry: {
+    type: "earned" | "spent" | "refund";
+    amount: number;
+    reason: string;
+  }
+) {
+  const histRef = db
+    .collection("users")
+    .doc(uid)
+    .collection("creditHistory")
+    .doc();
+  tx.set(histRef, {
+    ...entry,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
 // ── generateStickerSpecs ────────────────────────────────────────────────────
 //
 // 1. 驗證 Firebase Auth
-// 2. Firestore Transaction 原子性扣 1 點
-// 3. 呼叫 Gemini 2.0 Flash（文字）取得 8 組貼圖規格
-// 4. 回傳 specs + remainingCredits
+// 2. 呼叫 Gemini 2.0 Flash（文字）取得 8 組貼圖規格
+// 3. 回傳 specs（不扣點，Spec 預覽免費）
 
 export const generateStickerSpecs = onCall(
   {
@@ -26,31 +47,10 @@ export const generateStickerSpecs = onCall(
       throw new HttpsError("unauthenticated", "Login required.");
     }
 
-    const uid = request.auth.uid;
     const {photoBase64} = request.data as {photoBase64: string};
 
     if (!photoBase64) {
       throw new HttpsError("invalid-argument", "photoBase64 is required.");
-    }
-
-    // ── 原子性扣點 ──────────────────────────────────────────────────────────
-    const userRef = db.collection("users").doc(uid);
-    let remainingCredits = 0;
-
-    const deducted = await db.runTransaction(async (tx) => {
-      const doc = await tx.get(userRef);
-      const credits = (doc.data()?.credits as number) ?? 0;
-      if (credits <= 0) return false;
-      remainingCredits = credits - 1;
-      tx.update(userRef, {
-        credits: remainingCredits,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return true;
-    });
-
-    if (!deducted) {
-      throw new HttpsError("resource-exhausted", "Insufficient credits.");
     }
 
     // ── 呼叫 Gemini 文字 API ────────────────────────────────────────────────
@@ -98,11 +98,6 @@ export const generateStickerSpecs = onCall(
 
     if (!res.ok) {
       const errText = await res.text();
-      // 扣點已成功，但 AI 失敗 → 退還 1 點
-      await userRef.update({
-        credits: admin.firestore.FieldValue.increment(1),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
       throw new HttpsError(
         "internal",
         `Gemini text API error ${res.status}: ${errText.slice(0, 300)}`
@@ -119,31 +114,24 @@ export const generateStickerSpecs = onCall(
 
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) {
-      // 退還點數
-      await userRef.update({
-        credits: admin.firestore.FieldValue.increment(1),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
       throw new HttpsError("internal", "Invalid Gemini response format.");
     }
 
     const specs = JSON.parse(match[0]) as unknown[];
     if (!Array.isArray(specs) || specs.length < 8) {
-      await userRef.update({
-        credits: admin.firestore.FieldValue.increment(1),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
       throw new HttpsError("internal", "Gemini returned fewer than 8 specs.");
     }
 
-    return {specs: specs.slice(0, 8), remainingCredits};
+    return {specs: specs.slice(0, 8)};
   }
 );
 
 // ── generateStickerImage ────────────────────────────────────────────────────
 //
-// 不扣點（點數在 generateStickerSpecs 時已扣）
-// 只驗證登入，然後 proxy Gemini Image API
+// 1. 驗證 Firebase Auth
+// 2. Firestore Transaction 原子性扣 1 點 + 寫 creditHistory
+// 3. proxy Gemini Image API
+// 4. 失敗時退還 1 點 + 寫退點紀錄
 
 export const generateStickerImage = onCall(
   {
@@ -157,6 +145,7 @@ export const generateStickerImage = onCall(
       throw new HttpsError("unauthenticated", "Login required.");
     }
 
+    const uid = request.auth.uid;
     const {photoBase64, prompt} = request.data as {
       photoBase64: string;
       prompt: string;
@@ -169,6 +158,32 @@ export const generateStickerImage = onCall(
       );
     }
 
+    // ── 原子性扣點 + 寫 creditHistory ────────────────────────────────────────
+    const userRef = db.collection("users").doc(uid);
+    let remainingCredits = 0;
+
+    const deducted = await db.runTransaction(async (tx) => {
+      const doc = await tx.get(userRef);
+      const credits = (doc.data()?.credits as number) ?? 0;
+      if (credits <= 0) return false;
+      remainingCredits = credits - 1;
+      tx.update(userRef, {
+        credits: remainingCredits,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      writeCreditHistory(tx, uid, {
+        type: "spent",
+        amount: -1,
+        reason: "generate_sticker_image",
+      });
+      return true;
+    });
+
+    if (!deducted) {
+      throw new HttpsError("resource-exhausted", "Insufficient credits.");
+    }
+
+    // ── 呼叫 Gemini Image API ────────────────────────────────────────────────
     const apiKey = geminiApiKey.value();
     const endpoint =
       "https://generativelanguage.googleapis.com/v1beta" +
@@ -201,6 +216,18 @@ export const generateStickerImage = onCall(
     });
 
     if (res.status === 429) {
+      // 退還點數
+      await db.runTransaction(async (tx) => {
+        tx.update(userRef, {
+          credits: admin.firestore.FieldValue.increment(1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        writeCreditHistory(tx, uid, {
+          type: "refund",
+          amount: 1,
+          reason: "rate_limited",
+        });
+      });
       const retryAfter = res.headers.get("Retry-After") ?? "30";
       throw new HttpsError(
         "resource-exhausted",
@@ -210,6 +237,18 @@ export const generateStickerImage = onCall(
 
     if (!res.ok) {
       const errText = await res.text();
+      // 退還點數
+      await db.runTransaction(async (tx) => {
+        tx.update(userRef, {
+          credits: admin.firestore.FieldValue.increment(1),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        writeCreditHistory(tx, uid, {
+          type: "refund",
+          amount: 1,
+          reason: "api_error",
+        });
+      });
       throw new HttpsError(
         "internal",
         `Gemini image API error ${res.status}: ${errText.slice(0, 300)}`
@@ -229,10 +268,22 @@ export const generateStickerImage = onCall(
     const parts = json.candidates?.[0]?.content?.parts ?? [];
     for (const part of parts) {
       if (part.inlineData?.mimeType?.startsWith("image/")) {
-        return {imageBase64: part.inlineData.data};
+        return {imageBase64: part.inlineData.data, remainingCredits};
       }
     }
 
+    // 沒拿到圖片 → 退點
+    await db.runTransaction(async (tx) => {
+      tx.update(userRef, {
+        credits: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      writeCreditHistory(tx, uid, {
+        type: "refund",
+        amount: 1,
+        reason: "no_image_returned",
+      });
+    });
     throw new HttpsError("internal", "No image returned by Gemini.");
   }
 );

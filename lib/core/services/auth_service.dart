@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'firebase_service.dart';
+import '../../features/billing/models/credit_history_entry.dart';
 
 /// 點數常數
 const int kGuestInitialCredits = 1;      // 訪客初始點數（刻意給少，降低重裝誘因）
@@ -132,19 +133,45 @@ class AuthService {
     }
   }
 
-  /// 增加點數（看廣告 / 登入獎勵後呼叫）
-  static Future<void> addCredits(String uid, int amount) async {
+  /// 增加點數（看廣告 / 登入獎勵後呼叫）並寫入 creditHistory
+  static Future<void> addCredits(
+    String uid,
+    int amount, {
+    String reason = CreditHistoryReason.rewardedAd,
+  }) async {
     try {
-      await _userDoc(uid).set(
-        {
-          'credits': FieldValue.increment(amount),
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+      await _db.runTransaction((tx) async {
+        final ref = _userDoc(uid);
+        tx.set(
+          ref,
+          {
+            'credits': FieldValue.increment(amount),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+        _writeCreditHistory(tx, uid, type: 'earned', amount: amount, reason: reason);
+      });
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'add_credits_failed');
     }
+  }
+
+  /// 寫入點數異動紀錄（Transaction 內使用）
+  static void _writeCreditHistory(
+    Transaction tx,
+    String uid, {
+    required String type,
+    required int amount,
+    required String reason,
+  }) {
+    final histRef = _userDoc(uid).collection('creditHistory').doc();
+    tx.set(histRef, {
+      'type': type,
+      'amount': amount,
+      'reason': reason,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 
   // ── Private ──────────────────────────────────────────────────────────────
@@ -203,12 +230,18 @@ class AuthService {
     await _db.runTransaction((tx) async {
       final doc = await tx.get(ref);
       if (doc.exists) return; // 已存在，不覆蓋
+      final credits = isGuest ? kGuestInitialCredits : kNewAccountCredits;
       tx.set(ref, {
-        'credits': isGuest ? kGuestInitialCredits : kNewAccountCredits,
+        'credits': credits,
         'isAnonymous': isGuest,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      _writeCreditHistory(tx, uid,
+        type: 'earned',
+        amount: credits,
+        reason: CreditHistoryReason.newAccount,
+      );
     });
     FirebaseService.log(
       'AuthService: user doc created uid=$uid isGuest=$isGuest',
@@ -233,6 +266,14 @@ class AuthService {
         'promotedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      final bonus = newCredits - previousCredits;
+      if (bonus > 0) {
+        _writeCreditHistory(tx, uid,
+          type: 'earned',
+          amount: bonus,
+          reason: CreditHistoryReason.loginBonus,
+        );
+      }
     });
     FirebaseService.log('AuthService: user promoted uid=$uid → $kLoginBonusCredits credits');
   }
