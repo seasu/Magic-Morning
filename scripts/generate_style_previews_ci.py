@@ -77,11 +77,14 @@ STYLES = {
 }
 
 
-def generate_source_image(client, types) -> bytes:
+DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-preview-05-20"
+
+
+def generate_source_image(client, types, model: str) -> bytes:
     """使用 Gemini 文字生成貓咪來源圖片。"""
     print("🐱 cat_source.png 不存在，正在用 Gemini 生成來源圖片...", flush=True)
     response = client.models.generate_content(
-        model="gemini-2.5-flash-preview-05-20",
+        model=model,
         contents=SOURCE_IMAGE_PROMPT,
         config=types.GenerateContentConfig(
             response_modalities=["image"],
@@ -109,11 +112,14 @@ def main():
         from google import genai
         from google.genai import types
 
+    image_model = os.environ.get("GEMINI_IMAGE_MODEL", DEFAULT_IMAGE_MODEL)
+    print(f"🤖 Image model: {image_model}")
+
     client = genai.Client(api_key=api_key)
 
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     if not SOURCE_IMAGE.exists():
-        source_bytes = generate_source_image(client, types)
+        source_bytes = generate_source_image(client, types, image_model)
         SOURCE_IMAGE.write_bytes(source_bytes)
         print(f"   ✅ cat_source.png 已生成並儲存 ({len(source_bytes) // 1024}KB)\n")
     else:
@@ -131,7 +137,7 @@ def main():
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash-preview-05-20",
+                model=image_model,
                 contents=[
                     types.Content(
                         role="user",
