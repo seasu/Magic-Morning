@@ -835,10 +835,10 @@ class _GenerateButton extends StatelessWidget {
         onTap?.call();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         decoration: BoxDecoration(
           gradient: AppColors.gradient,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.2),
@@ -850,12 +850,12 @@ class _GenerateButton extends StatelessWidget {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
-            SizedBox(width: 6),
+            Icon(Icons.auto_awesome_rounded, size: 22, color: Colors.white),
+            SizedBox(width: 8),
             Text(
               '生成 · 1點',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 18,
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
