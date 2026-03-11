@@ -28,13 +28,20 @@ class AuthService {
   static Future<void> signInAnonymouslyIfNeeded() async {
     if (_auth.currentUser != null) return; // 已有帳號（匿名或真實）
 
+    String uid;
     try {
       final result = await _auth.signInAnonymously();
-      final uid = result.user!.uid;
+      uid = result.user!.uid;
       FirebaseService.log('AuthService: anonymous sign-in uid=$uid');
-      await _ensureUserDoc(uid, isGuest: true);
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'anon_sign_in_failed');
+      return;
+    }
+
+    try {
+      await _ensureUserDoc(uid, isGuest: true);
+    } catch (e, stack) {
+      await FirebaseService.recordError(e, stack, reason: 'ensure_user_doc_failed');
     }
   }
 
@@ -133,7 +140,7 @@ class AuthService {
     }
   }
 
-  /// 增加點數（看廣告 / 登入獎勵後呼叫）並寫入 creditHistory
+  /// 增加點數（看廣告 / 登入獎勵後呼叫）
   static Future<void> addCredits(
     String uid,
     int amount, {
@@ -150,28 +157,12 @@ class AuthService {
           },
           SetOptions(merge: true),
         );
-        _writeCreditHistory(tx, uid, type: 'earned', amount: amount, reason: reason);
+        // NOTE: creditHistory writes are reserved for Cloud Functions only
+        // (Firestore rules: allow read only for clients).
       });
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'add_credits_failed');
     }
-  }
-
-  /// 寫入點數異動紀錄（Transaction 內使用）
-  static void _writeCreditHistory(
-    Transaction tx,
-    String uid, {
-    required String type,
-    required int amount,
-    required String reason,
-  }) {
-    final histRef = _userDoc(uid).collection('creditHistory').doc();
-    tx.set(histRef, {
-      'type': type,
-      'amount': amount,
-      'reason': reason,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
   }
 
   // ── Private ──────────────────────────────────────────────────────────────
@@ -237,11 +228,9 @@ class AuthService {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      _writeCreditHistory(tx, uid,
-        type: 'earned',
-        amount: credits,
-        reason: CreditHistoryReason.newAccount,
-      );
+      // NOTE: creditHistory writes are reserved for Cloud Functions only
+      // (Firestore rules: allow read only for clients). Initial credit is
+      // visible on the user document itself.
     });
     FirebaseService.log(
       'AuthService: user doc created uid=$uid isGuest=$isGuest',
@@ -264,11 +253,7 @@ class AuthService {
         'promotedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      _writeCreditHistory(tx, uid,
-        type: 'earned',
-        amount: kLoginBonusCredits,
-        reason: CreditHistoryReason.loginBonus,
-      );
+      // NOTE: creditHistory writes are reserved for Cloud Functions only.
     });
     FirebaseService.log('AuthService: user promoted uid=$uid +$kLoginBonusCredits credits');
   }
