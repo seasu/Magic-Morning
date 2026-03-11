@@ -429,41 +429,6 @@ class _TopBar extends StatelessWidget {
 
 // ─── 進度條 ──────────────────────────────────────────────────────────────────
 
-class _ProgressBar extends StatelessWidget {
-  final int current;
-
-  const _ProgressBar({required this.current});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(8, (i) {
-          final isActive = i == current;
-          final isPast = i < current;
-          return Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              height: 4,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: isPast
-                    ? _kLikeColor.withValues(alpha: 0.6)
-                    : isActive
-                        ? Colors.black87
-                        : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
 // ─── 卡片層疊 ─────────────────────────────────────────────────────────────────
 
 class _CardStack extends StatelessWidget {
@@ -932,50 +897,6 @@ class _SaveButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-// ─── Tinder 大圓形按鈕 ────────────────────────────────────────────────────────
-
-class _TinderButtons extends StatelessWidget {
-  final bool isExporting;
-  final VoidCallback? onNope;
-  final VoidCallback? onLike;
-
-  const _TinderButtons({
-    required this.isExporting,
-    required this.onNope,
-    required this.onLike,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _CircleButton(
-          size: 64,
-          icon: Icons.close_rounded,
-          iconSize: 30,
-          iconColor: _kNopeColor,
-          bgColor: Colors.white,
-          borderColor: _kNopeColor,
-          shadowColor: _kNopeColor,
-          onTap: onNope,
-        ),
-        const SizedBox(width: 52),
-        _CircleButton(
-          size: 76,
-          icon: isExporting ? null : Icons.favorite_rounded,
-          iconSize: 36,
-          iconColor: Colors.white,
-          bgColor: _kLikeColor,
-          shadowColor: _kLikeColor,
-          isLoading: isExporting,
-          onTap: onLike,
-        ),
-      ],
     );
   }
 }
