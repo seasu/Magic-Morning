@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | MagicMorning（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v3.1.15+136 |
+| 目前版本 | v3.1.16+137 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash（圖片生成）|
@@ -207,6 +207,7 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.16 | 2026-03-11 | **UI/UX fix**：EditorScreen 生成失敗狀態三項修正：(1) 底部按鈕邏輯修正——失敗（`Uint8List(0)`）時改顯示「生成·1點」而非「儲存貼圖」，避免 token 時序混淆；(2) `_accept()` 新增失敗狀態 guard，防止匯出空白圖；(3) 錯誤提示從頂部小 badge 改為全卡片居中大型覆蓋層（`_FailedOverlay`），文字 24sp+加粗+重試按鈕，視覺更清晰 |
 | v3.1.15 | 2026-03-11 | **Bug fix**：修正 `StickerGenerationService` 在 `unauthenticated` 錯誤時的 retry 無效問題；原先呼叫 `signInAnonymouslyIfNeeded()`（currentUser 不為 null 時直接 return，retry 無效），改為 `user.getIdToken(true)` 強制刷新 ID token，確保 token 過期或 linkWithCredential 後短暫失效時能正確重試 |
 | v3.1.14 | 2026-03-11 | **Bug fix**：修正 Google 登入後點數未更新的 3 個問題：(1) `_promoteUser` 改用 in-transaction read + 直接累加登入獎勵，修正原先以 `max(prev, 5)` 導致有 100 點時獎勵為 0 的 bug；(2) `authStateProvider` 改用 `userChanges()` 取代 `authStateChanges()`，使 `linkWithCredential` 升級訪客帳號時（UID 不變）也能觸發 UI 更新，修正登入後仍顯示訪客樣式的問題；(3) `CreditNotifier` 新增偵測 `isAnonymous` 變化，升級後自動重載點數，修正點數顯示未更新及點數紀錄缺少登入獎勵紀錄的問題 |
 | v3.1.9 | 2026-03-11 | **CI fix**：移除 `editor_screen.dart` 中未使用的 `_kNopeColor` 常數與 `_CircleButton`/`_CircleButtonState` 死碼，修正 `dart analyze --fatal-infos` 的 5 個 `unused_element`/`unused_element_parameter` 警告 |
