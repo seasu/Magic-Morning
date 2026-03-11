@@ -1,18 +1,39 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../models/credit_history_entry.dart';
 
 /// 每次看廣告獲得的點數
 const int kCreditsPerAd = 1;
 
-// ── Provider ──────────────────────────────────────────────────────────────────
+// ── Providers ─────────────────────────────────────────────────────────────────
 
 final creditProvider = NotifierProvider<CreditNotifier, int>(
   CreditNotifier.new,
 );
+
+/// 點數異動紀錄（按時間降序，最多 50 筆）
+final creditHistoryProvider = FutureProvider.autoDispose<List<CreditHistoryEntry>>((ref) async {
+  final uid = ref.watch(currentUserProvider)?.uid;
+  if (uid == null) return [];
+  try {
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('creditHistory')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .get();
+    return snap.docs.map(CreditHistoryEntry.fromDoc).toList();
+  } catch (e, stack) {
+    await FirebaseService.recordError(e, stack, reason: 'credit_history_load_failed');
+    return [];
+  }
+});
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
@@ -61,11 +82,14 @@ class CreditNotifier extends Notifier<int> {
   }
 
   /// 增加點數（看廣告 / 登入獎勵後呼叫）
-  Future<void> addCredits(int amount) async {
+  Future<void> addCredits(
+    int amount, {
+    String reason = CreditHistoryReason.rewardedAd,
+  }) async {
     final uid = ref.read(currentUserProvider)?.uid;
     if (uid == null) return;
 
-    await AuthService.addCredits(uid, amount);
+    await AuthService.addCredits(uid, amount, reason: reason);
     state = state + amount;
     FirebaseService.log('CreditProvider: +$amount → total ${state}');
   }

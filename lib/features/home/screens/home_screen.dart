@@ -13,9 +13,7 @@ import '../../../core/models/sticker_shape.dart';
 import '../../../core/models/sticker_style.dart';
 import '../../../core/services/firebase_service.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../features/billing/providers/credit_provider.dart';
 import '../../../shared/widgets/credit_badge.dart';
-import '../../../shared/widgets/credit_paywall_dialog.dart';
 import '../widgets/pick_image_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -80,14 +78,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     HapticFeedback.mediumImpact();
     FirebaseService.log('HomeScreen._pickImage: source=${source.name}');
 
-    // ① 點數關卡：不足則顯示 Paywall
-    final credits = ref.read(creditProvider);
-    if (credits <= 0) {
-      FirebaseService.log('HomeScreen._pickImage: no credits → showing paywall');
-      final earned = await CreditPaywallDialog.show(context, ref);
-      if (!earned || !context.mounted) return;
-    }
-
+    // Spec 預覽免費，直接選圖
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: source, imageQuality: 95);
     if (picked == null || !context.mounted) return;
@@ -102,8 +93,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
     if (result == null || !context.mounted) return;
 
-    // ③ 點數扣除由 Cloud Function (generateStickerSpecs) 原子性處理
-    // ④ 立即跳 editor，loading 馬上開始
+    // 立即跳 editor，AI Spec 生成馬上開始（免費）
     context.push(
       '/editor',
       extra: EditorArgs(

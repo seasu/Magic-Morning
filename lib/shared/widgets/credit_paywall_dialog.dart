@@ -123,7 +123,7 @@ class _CreditPaywallDialogState extends ConsumerState<CreditPaywallDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              '生成 1 組貼圖需要 1 點\n透過下列方式免費取得：',
+              '生成 1 張貼圖需要 1 點\n透過下列方式免費取得：',
               style: GoogleFonts.notoSansTc(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

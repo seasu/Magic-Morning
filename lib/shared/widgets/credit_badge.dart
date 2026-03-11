@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -23,7 +24,7 @@ class CreditBadge extends ConsumerWidget {
     return GestureDetector(
       onTap: isGuest
           ? () => LoginBottomSheet.show(context)
-          : null,
+          : () => context.push('/credit-history'),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

@@ -16,8 +16,10 @@ import 'firebase_service.dart';
 class StickerGenerationService {
   static final _fn = FirebaseFunctions.instanceFor(region: 'asia-east1');
 
-  /// 生成單張貼圖，回傳 PNG bytes；失敗回傳 null
-  Future<Uint8List?> generateSingle(
+  /// 生成單張貼圖，扣 1 點後回傳 PNG bytes 和剩餘點數。
+  ///
+  /// [bytes] null = 生成失敗；[remainingCredits] -1 = 無法取得（點數已由 Cloud Function 退還）
+  Future<({Uint8List? bytes, int remainingCredits})> generateSingle(
     Uint8List photoBytes,
     StickerSpec spec, {
     int index = 0,
@@ -47,17 +49,20 @@ class StickerGenerationService {
 
         final imageBase64 = result.data['imageBase64'] as String;
         final bytes = base64Decode(imageBase64);
+        final remaining = (result.data['remainingCredits'] as num?)?.toInt() ?? -1;
 
         FirebaseService.log(
-          'StickerGenerationService: index=$index OK (${bytes.lengthInBytes} bytes)',
+          'StickerGenerationService: index=$index OK '
+          '(${bytes.lengthInBytes} bytes) remainingCredits=$remaining',
         );
         await FirebaseAnalytics.instance
             .logEvent(name: 'sticker_image_generated');
-        return bytes;
+        return (bytes: bytes, remainingCredits: remaining);
       } on FirebaseFunctionsException catch (e, stack) {
         final isRateLimit = e.code == 'resource-exhausted';
 
-        if (isRateLimit && attempt < maxRetries) {
+        // rate-limited without credit message → retry（Cloud Function 已退點）
+        if (isRateLimit && e.message?.contains('Rate limited') == true && attempt < maxRetries) {
           final delay = _parseRetryDelay(e.message ?? '') ??
               Duration(seconds: (attempt + 1) * 15);
           FirebaseService.log(
@@ -68,19 +73,24 @@ class StickerGenerationService {
           continue;
         }
 
+        // 點數不足 → 直接 rethrow，讓 editor_provider 顯示 paywall
+        if (isRateLimit && e.message?.contains('Insufficient') == true) {
+          rethrow;
+        }
+
         await FirebaseService.recordError(
           e, stack, reason: 'sticker_single_gen_fn_failed_index$index',
         );
-        return null;
+        return (bytes: null, remainingCredits: -1);
       } catch (e, stack) {
         await FirebaseService.recordError(
           e, stack, reason: 'sticker_single_gen_failed_index$index',
         );
-        return null;
+        return (bytes: null, remainingCredits: -1);
       }
     }
 
-    return null;
+    return (bytes: null, remainingCredits: -1);
   }
 
   // ─── private ────────────────────────────────────────────────────────────

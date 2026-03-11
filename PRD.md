@@ -32,22 +32,24 @@
 **生成流程**
 ```
 選圖 → Resize（≤1080px）
-  → Cloud Function: generateStickerSpecs
+  → Cloud Function: generateStickerSpecs（免費）
       ├── 驗證 Firebase Auth
-      ├── Firestore Transaction 原子性扣 1 點
-      └── 呼叫 Gemini 2.0 Flash（文字）→ 取得 8 組規格
-  → 並行觸發 8 個 Cloud Function: generateStickerImage
-      ├── 驗證 Firebase Auth（無再次扣點）
-      └── 呼叫 Gemini 2.5 Flash（圖片）→ 回傳 PNG base64
-  → 每張完成後即時顯示在對應 Swipe 卡片
-  → 失敗 → Flutter fallback（彩色背景 + 文字疊加）
+      └── 呼叫 Gemini 2.0 Flash（文字）→ 取得 8 組規格（不扣點）
+  → Editor 顯示 8 張 Spec 預覽卡片（文字 + 情緒 + 背景色）
+  → 使用者點擊「生成 · 1點」觸發個別貼圖生成
+      → Cloud Function: generateStickerImage（1 點/張）
+          ├── 驗證 Firebase Auth
+          ├── Firestore Transaction 原子性扣 1 點
+          ├── 寫入 creditHistory 紀錄
+          └── 呼叫 Gemini 2.5 Flash（圖片）→ 回傳 PNG base64
+  → 生成失敗自動退點 + 寫入退點紀錄
 ```
 
 **Cloud Functions 規格**
 | Function | 記憶體 | 逾時 | 說明 |
 |---|---|---|---|
-| `generateStickerSpecs` | 512 MiB | 60s | 扣點 + AI 文字規格 |
-| `generateStickerImage` | 1 GiB | 120s | AI 圖片生成（proxy） |
+| `generateStickerSpecs` | 512 MiB | 60s | AI 文字規格（免費，不扣點）|
+| `generateStickerImage` | 1 GiB | 120s | AI 圖片生成（1點/張，含 creditHistory）|
 
 **輸出規格（LINE Creators Market 官方）**
 | 項目 | 規格 |
@@ -106,11 +108,14 @@ authStateProvider → StreamProvider<User?>
 └── iOS Keychain 保護：重裝後匿名 UID 不變（Android 重裝才重置）
 
 creditProvider → int (點數，來自 Firestore)
+creditHistoryProvider → List<CreditHistoryEntry> (最近 50 筆異動紀錄)
 ├── 訪客首次 1 點（降低重裝誘因）
 ├── 登入升級 5 點
 ├── 看廣告 +1 點（AdMob Rewarded Ad）
 ├── 購買點數包（未來 IAP 串接）
-└── Firestore: users/{uid}/credits（原子性 Transaction 扣點）
+├── 每張圖片生成扣 1 點（1 點 = 1 張，非 1 點 = 8 張）
+├── 所有點數異動寫入 users/{uid}/creditHistory（供使用者查閱）
+└── Firestore: users/{uid}/credits（原子性 Transaction）
 
 Firestore 資料結構:
 users/{uid}/
@@ -202,6 +207,7 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.0 | 2026-03-11 | **計費重構**：1 點 = 1 張圖片（原為 1 點 = 8 張）；`generateStickerSpecs` 免費、`generateStickerImage` 原子性扣 1 點；新增 `creditHistory` Firestore 子集合記錄所有點數異動；新增「點數紀錄」UI 頁面；`CreditBadge` 點擊可查閱異動紀錄；`functions/package.json` Node 22 |
 | v3.0.23 | 2026-03-10 | **資源更新**：更新 `assets/app_icon.png` |
 | v3.0.22 | 2026-03-10 | **清理**：刪除未使用的 `assets/HEIF影像.jpeg` |
 | v3.0.21 | 2026-03-10 | **資源更新**：手動更新 `app_icon.png` |

@@ -1,7 +1,7 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show Offset;
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,13 +25,13 @@ class _EditorFamilyNotifier
   /// AI 自由規格暫存（不放進 state 以免觸發多餘 rebuild）
   List<StickerSpec>? _specs;
 
-  /// 每次重新生成遞增，用來取消舊的背景任務
-  int _generationId = 0;
+  /// 縮圖快取（避免每次生成都重新 resize）
+  Uint8List? _cachedResized;
 
   @override
   EditorState build(String arg) => EditorState(originalImagePath: arg);
 
-  /// 初始化：兩步流程
+  /// 初始化：取得 Spec（免費，不扣點）
   ///
   /// [defaultStyleIndex] 對應 [StickerStyle.values]，預設 0（Q版卡通）
   /// [stickerShape] 貼圖形狀，預設圓形
@@ -45,10 +45,9 @@ class _EditorFamilyNotifier
       stickerShape: stickerShape,
     );
 
-    Uint8List resized;
     try {
       final imageFile = File(state.originalImagePath);
-      resized = await ImageProcessor.resizeForNative(imageFile);
+      _cachedResized = await ImageProcessor.resizeForNative(imageFile);
     } catch (e, stack) {
       await FirebaseService.recordError(
         e, stack, reason: 'editor_resize_failed',
@@ -60,41 +59,108 @@ class _EditorFamilyNotifier
       return;
     }
 
-    final result = await GeminiService().generateStickerSpecs(resized);
-    _specs = result.specs;
-    // 若 Cloud Function 回傳剩餘點數（≥ 0），更新本地顯示
-    if (result.remainingCredits >= 0) {
-      ref.read(creditProvider.notifier).updateCredits(result.remainingCredits);
-    }
+    final specs = await GeminiService().generateStickerSpecs(_cachedResized!);
+    _specs = specs;
     final texts = _specs!.map((s) => s.text).toList();
-    state = state.copyWith(stickerTexts: texts, status: EditorStatus.ready);
-    final genId = ++_generationId;
-    unawaited(_generateImagesInBackground(resized, _specs!, genId));
+    state = state.copyWith(
+      stickerTexts: texts,
+      generatedImages: List.filled(8, _kNotGeneratedSentinel),
+      imageErrors: List.filled(8, null),
+      status: EditorStatus.ready,
+    );
   }
 
-  /// 重新讓 AI 自由發揮，生成全新 8 組規格 + 圖片
+  /// 重新讓 AI 自由發揮，生成全新 8 組規格（免費，不扣點）
   Future<void> regenerateTexts() async {
     state = state.copyWith(
       status: EditorStatus.generatingTexts,
-      generatedImages: List.filled(8, null),
+      generatedImages: List.filled(8, _kNotGeneratedSentinel),
       imageErrors: List.filled(8, null),
     );
     try {
-      final resized = await ImageProcessor.resizeForNative(
-        File(state.originalImagePath),
-      );
-      final result = await GeminiService().generateStickerSpecs(resized);
-      _specs = result.specs;
-      if (result.remainingCredits >= 0) {
-        ref.read(creditProvider.notifier).updateCredits(result.remainingCredits);
-      }
+      final resized = _cachedResized ??
+          await ImageProcessor.resizeForNative(File(state.originalImagePath));
+      _cachedResized = resized;
+      final specs = await GeminiService().generateStickerSpecs(resized);
+      _specs = specs;
       final texts = _specs!.map((s) => s.text).toList();
       state = state.copyWith(stickerTexts: texts, status: EditorStatus.ready);
-      final genId = ++_generationId;
-      unawaited(_generateImagesInBackground(resized, _specs!, genId));
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'editor_regen_failed');
       state = state.copyWith(status: EditorStatus.ready);
+    }
+  }
+
+  /// 使用者主動觸發第 [index] 張貼圖的圖片生成（扣 1 點）
+  ///
+  /// 回傳值：
+  ///   'ok'              — 成功
+  ///   'insufficient'    — 點數不足（呼叫方應彈出 paywall）
+  ///   'error'           — 其他錯誤
+  Future<String> generateSingleImage(int index) async {
+    if (_specs == null || index >= _specs!.length) return 'error';
+
+    // 設定 loading 狀態
+    final loading = List<Uint8List?>.from(state.generatedImages);
+    final clearErrors = List<String?>.from(state.imageErrors);
+    loading[index] = null;
+    clearErrors[index] = null;
+    state = state.copyWith(generatedImages: loading, imageErrors: clearErrors);
+
+    final styleIdx = state.styleIndices[index];
+
+    try {
+      final resized = _cachedResized ??
+          await ImageProcessor.resizeForNative(File(state.originalImagePath));
+      _cachedResized = resized;
+
+      final result = await StickerGenerationService().generateSingle(
+        resized,
+        _specs![index],
+        index: index,
+        styleIndex: styleIdx,
+        shape: state.stickerShape,
+      );
+
+      // 更新 credit（Cloud Function 回傳剩餘點數）
+      if (result.remainingCredits >= 0) {
+        ref.read(creditProvider.notifier).updateCredits(result.remainingCredits);
+      }
+
+      final updated = List<Uint8List?>.from(state.generatedImages);
+      final errors = List<String?>.from(state.imageErrors);
+      updated[index] = result.bytes ?? Uint8List(0);
+      if (result.bytes == null) errors[index] = 'API 未回傳圖片';
+      state = state.copyWith(generatedImages: updated, imageErrors: errors);
+      return result.bytes != null ? 'ok' : 'error';
+    } on FirebaseFunctionsException catch (e, stack) {
+      if (e.code == 'resource-exhausted' &&
+          e.message?.contains('Insufficient') == true) {
+        // 點數不足，還原 loading 狀態（sentinel = Uint8List(0) 表示「未生成/待生成」）
+        // 注意：此時點數未扣，不需退還
+        final reset = List<Uint8List?>.from(state.generatedImages);
+        // 重設為特殊 sentinel：空 Uint8List(1) 表示「未選擇生成」
+        reset[index] = _kNotGeneratedSentinel;
+        state = state.copyWith(generatedImages: reset);
+        return 'insufficient';
+      }
+      await FirebaseService.recordError(e, stack,
+          reason: 'generate_single_image_fn_failed_index$index');
+      final failed = List<Uint8List?>.from(state.generatedImages);
+      failed[index] = Uint8List(0);
+      final errors = List<String?>.from(state.imageErrors);
+      errors[index] = kDebugMode ? e.toString() : _classifyError(e);
+      state = state.copyWith(generatedImages: failed, imageErrors: errors);
+      return 'error';
+    } catch (e, stack) {
+      await FirebaseService.recordError(e, stack,
+          reason: 'generate_single_image_failed_index$index');
+      final failed = List<Uint8List?>.from(state.generatedImages);
+      failed[index] = Uint8List(0);
+      final errors = List<String?>.from(state.imageErrors);
+      errors[index] = kDebugMode ? e.toString() : _classifyError(e);
+      state = state.copyWith(generatedImages: failed, imageErrors: errors);
+      return 'error';
     }
   }
 
@@ -121,12 +187,12 @@ class _EditorFamilyNotifier
 
   /// 使用者在編輯 popup 選擇產圖風格
   ///
-  /// 風格直接影響 Gemini prompt，選完後立即重新生成該張圖片。
+  /// 風格直接影響 Gemini prompt，選完後立即重新生成該張圖片（扣 1 點）。
   Future<void> updateStyleIndex(int stickerIdx, int styleIdx) async {
     final updated = List<int>.from(state.styleIndices);
     updated[stickerIdx] = styleIdx;
     state = state.copyWith(styleIndices: updated);
-    await retryImageGeneration(stickerIdx);
+    await generateSingleImage(stickerIdx);
   }
 
   /// 使用者調整字體大小倍率
@@ -177,91 +243,14 @@ class _EditorFamilyNotifier
         imageScales: scales, imageOffsets: offsets, imageAngles: angles);
   }
 
-  /// 重新生成指定索引的 AI 貼圖（單張重試）
+  /// 重新生成指定索引的 AI 貼圖（單張重試，扣 1 點）
   Future<void> retryImageGeneration(int index) async {
-    if (_specs == null || index >= _specs!.length) return;
-
-    final reset = List<Uint8List?>.from(state.generatedImages);
-    reset[index] = null;
-    final clearErrors = List<String?>.from(state.imageErrors);
-    clearErrors[index] = null;
-    state = state.copyWith(generatedImages: reset, imageErrors: clearErrors);
-
-    final styleIdx = state.styleIndices[index];
-
-    try {
-      final resized = await ImageProcessor.resizeForNative(
-          File(state.originalImagePath));
-
-      final bytes = await StickerGenerationService().generateSingle(
-        resized,
-        _specs![index],
-        index: index,
-        styleIndex: styleIdx,
-        shape: state.stickerShape,
-      );
-      final updated = List<Uint8List?>.from(state.generatedImages);
-      final errors = List<String?>.from(state.imageErrors);
-      updated[index] = bytes ?? Uint8List(0);
-      if (bytes == null) errors[index] = 'API 未回傳圖片';
-      state = state.copyWith(generatedImages: updated, imageErrors: errors);
-    } catch (e, stack) {
-      await FirebaseService.recordError(e, stack,
-          reason: 'retry_image_generation_failed');
-      final failed = List<Uint8List?>.from(state.generatedImages);
-      failed[index] = Uint8List(0);
-      final errors = List<String?>.from(state.imageErrors);
-      errors[index] = _classifyError(e);
-      state = state.copyWith(generatedImages: failed, imageErrors: errors);
-    }
+    await generateSingleImage(index);
   }
 
   // ─── private ────────────────────────────────────────────
 
-  /// 逐張生成 8 張貼圖，每完成一張立即更新 state（用戶可即時看到）
-  ///
-  /// sentinel 規則（Uint8List?）：
-  ///   null          → 生成中（loading）
-  ///   Uint8List(0)  → 失敗（imageErrors[i] 有原因）
-  ///   Uint8List(>0) → 成功
-  Future<void> _generateImagesInBackground(
-      Uint8List photoBytes, List<StickerSpec> specs, int genId) async {
-    final service = StickerGenerationService();
-    for (int i = 0; i < specs.length; i++) {
-      // 若已有新一輪重新生成，停止舊任務
-      if (genId != _generationId) return;
-
-      final styleIdx = state.styleIndices[i];
-
-      try {
-        final bytes = await service.generateSingle(
-          photoBytes,
-          specs[i],
-          index: i,
-          styleIndex: styleIdx,
-          shape: state.stickerShape,
-        );
-        if (genId != _generationId) return;
-        final updated = List<Uint8List?>.from(state.generatedImages);
-        final errors = List<String?>.from(state.imageErrors);
-        updated[i] = bytes ?? Uint8List(0);
-        if (bytes == null) errors[i] = 'API 未回傳圖片';
-        state = state.copyWith(generatedImages: updated, imageErrors: errors);
-      } catch (e, stack) {
-        if (genId != _generationId) return;
-        await FirebaseService.recordError(e, stack,
-            reason: 'background_image_gen_failed_index$i');
-        final failed = List<Uint8List?>.from(state.generatedImages);
-        failed[i] = Uint8List(0);
-        final errors = List<String?>.from(state.imageErrors);
-        errors[i] = kDebugMode ? e.toString() : _classifyError(e);
-        state = state.copyWith(generatedImages: failed, imageErrors: errors);
-      }
-    }
-  }
-
   /// 將例外轉換為使用者看得懂的中文訊息
-  /// Crashlytics 另外記錄完整 stack trace，此處只給 UI 用
   static String _classifyError(Object e) {
     final msg = e.toString().toLowerCase();
     if (e is SocketException || msg.contains('network') || msg.contains('socket')) {
@@ -282,3 +271,16 @@ class _EditorFamilyNotifier
     return '生成失敗';
   }
 }
+
+/// 尚未選擇生成的 sentinel：length = 1 的空 Uint8List
+///
+/// sentinel 規則（generatedImages[i]）：
+///   null                — 生成中（loading）
+///   _kNotGeneratedSentinel (length=1) — 尚未選擇生成
+///   Uint8List(0) (length=0)           — 生成失敗
+///   Uint8List(>1) (length>1)          — 成功
+final _kNotGeneratedSentinel = Uint8List(1);
+
+/// 判斷是否為「尚未生成」sentinel
+bool isNotGeneratedSentinel(Uint8List? bytes) =>
+    bytes != null && bytes.length == 1;
