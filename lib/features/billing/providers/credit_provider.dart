@@ -44,9 +44,10 @@ final creditHistoryProvider = FutureProvider.autoDispose<List<CreditHistoryEntry
 class CreditNotifier extends Notifier<int> {
   @override
   int build() {
-    // 監聽 auth 狀態，用戶切換時重新載入點數
+    // 監聽 auth 狀態，用戶切換或匿名升級時重新載入點數
+    // 注意：linkWithCredential 升級訪客帳號時 UID 不變，但 isAnonymous 會從 true → false
     ref.listen<User?>(currentUserProvider, (prev, next) {
-      if (next?.uid != prev?.uid) {
+      if (next?.uid != prev?.uid || prev?.isAnonymous != next?.isAnonymous) {
         _onUserChanged(next);
       }
     });
