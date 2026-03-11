@@ -58,7 +58,7 @@ for style_key, prompt in STYLES.items():
     print(f"  🎨 {style_key}...", end=" ", flush=True)
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash-preview-image-generation",
+            model="gemini-2.5-flash-preview-05-20",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_modalities=["image"],

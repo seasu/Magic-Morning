@@ -116,7 +116,7 @@ def generate_with_gemini_flash(api_key: str, style_key: str, style_info: dict, s
         source_b64 = base64.b64encode(source_bytes).decode()
 
         response = client.models.generate_content(
-            model="gemini-2.0-flash-preview-image-generation",
+            model="gemini-2.5-flash-preview-05-20",
             contents=[
                 types.Content(
                     role="user",

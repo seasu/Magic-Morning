@@ -81,7 +81,7 @@ def generate_source_image(client, types) -> bytes:
     """使用 Gemini 文字生成貓咪來源圖片。"""
     print("🐱 cat_source.png 不存在，正在用 Gemini 生成來源圖片...", flush=True)
     response = client.models.generate_content(
-        model="gemini-2.0-flash-exp-image-generation",
+        model="gemini-2.5-flash-preview-05-20",
         contents=SOURCE_IMAGE_PROMPT,
         config=types.GenerateContentConfig(
             response_modalities=["image"],
@@ -131,7 +131,7 @@ def main():
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.0-flash-exp-image-generation",
+                model="gemini-2.5-flash-preview-05-20",
                 contents=[
                     types.Content(
                         role="user",
