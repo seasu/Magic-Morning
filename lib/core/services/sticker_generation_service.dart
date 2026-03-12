@@ -35,23 +35,10 @@ class StickerGenerationService {
       'emotion=${spec.emotion} style=${style.label}',
     );
 
-    // 確保呼叫前有 Firebase Auth session（startup 時若網路失敗可能為 null）
-    if (FirebaseAuth.instance.currentUser == null) {
-      FirebaseService.log('StickerGenerationService: no auth session, attempting sign-in');
-      await AuthService.signInAnonymouslyIfNeeded();
-      // sign-in 仍失敗 → 立即結束，無法呼叫 Cloud Function
-      if (FirebaseAuth.instance.currentUser == null) {
-        FirebaseService.log('StickerGenerationService: sign-in failed, aborting index=$index');
-        return (bytes: null, remainingCredits: -1);
-      }
-    } else {
-      // 預先強制刷新 token，避免因 token 過期導致第一次呼叫就 UNAUTHENTICATED
-      try {
-        await FirebaseAuth.instance.currentUser!.getIdToken(true);
-      } catch (e) {
-        FirebaseService.log('StickerGenerationService: pre-flight token refresh failed: $e');
-        // 繼續嘗試，交由 retry loop 處理
-      }
+    // 確保呼叫前有 Firebase Auth session + 有效 token
+    final preflightOk = await _ensureValidAuth(index);
+    if (!preflightOk) {
+      return (bytes: null, remainingCredits: -1);
     }
 
     const maxRetries = 3;
@@ -80,28 +67,21 @@ class StickerGenerationService {
             .logEvent(name: 'sticker_image_generated');
         return (bytes: bytes, remainingCredits: remaining);
       } on FirebaseFunctionsException catch (e, stack) {
-        // 未認證 → 強制刷新 ID token 後 retry（token 過期或 linkWithCredential 後短暫失效）
-        // 加入指數退避延遲（1s / 2s / 4s），讓 Firebase Auth 後端有時間完成 token rotation。
+        // 未認證 → 強制刷新 ID token 後 retry
         if (e.code == 'unauthenticated' && attempt < maxRetries) {
           FirebaseService.log(
             'StickerGenerationService: unauthenticated index=$index, '
-            'refreshing token attempt ${attempt + 1}/$maxRetries',
+            'attempt ${attempt + 1}/$maxRetries — re-authenticating',
           );
-          final user = FirebaseAuth.instance.currentUser;
-          if (user != null) {
-            await user.getIdToken(true); // 強制刷新，忽略快取
-          } else {
-            await AuthService.signInAnonymouslyIfNeeded();
-            // sign-in 後仍無 session → 無需繼續重試
-            if (FirebaseAuth.instance.currentUser == null) {
-              await FirebaseService.recordError(
-                e, stack, reason: 'sticker_single_gen_fn_failed_no_auth_index$index',
-              );
-              return (bytes: null, remainingCredits: -1);
-            }
+          // 退避等待：2s → 4s → 8s，讓 Firebase Auth 後端完成 token rotation
+          await Future.delayed(Duration(seconds: 2 << attempt));
+          final ok = await _ensureValidAuth(index);
+          if (!ok) {
+            await FirebaseService.recordError(
+              e, stack, reason: 'sticker_single_gen_fn_failed_no_auth_index$index',
+            );
+            return (bytes: null, remainingCredits: -1);
           }
-          // 退避等待：1s → 2s → 4s，避免在 linkWithCredential token rotation 視窗內立即重試
-          await Future.delayed(Duration(seconds: 1 << attempt));
           continue;
         }
         if (e.code == 'unauthenticated') {
@@ -143,6 +123,54 @@ class StickerGenerationService {
     }
 
     return (bytes: null, remainingCredits: -1);
+  }
+
+  /// 確保有有效的 Firebase Auth session 和 ID token。
+  ///
+  /// 回傳 true = 就緒可呼叫 Cloud Function；false = 認證失敗，放棄。
+  Future<bool> _ensureValidAuth(int index) async {
+    var user = FirebaseAuth.instance.currentUser;
+
+    // 沒有 user → 嘗試匿名登入
+    if (user == null) {
+      FirebaseService.log('StickerGenerationService: no auth session, signing in');
+      await AuthService.signInAnonymouslyIfNeeded();
+      user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        FirebaseService.log('StickerGenerationService: sign-in failed, aborting index=$index');
+        return false;
+      }
+    }
+
+    // 強制刷新 ID token，確保不過期
+    try {
+      final token = await user.getIdToken(true);
+      if (token == null || token.isEmpty) {
+        FirebaseService.log('StickerGenerationService: getIdToken returned null/empty, re-signing');
+        // token 無法取得 → 登出後重新匿名登入
+        await FirebaseAuth.instance.signOut();
+        await AuthService.signInAnonymouslyIfNeeded();
+        final retryUser = FirebaseAuth.instance.currentUser;
+        if (retryUser == null) return false;
+        final retryToken = await retryUser.getIdToken(true);
+        return retryToken != null && retryToken.isNotEmpty;
+      }
+      return true;
+    } catch (e) {
+      FirebaseService.log('StickerGenerationService: token refresh failed: $e, re-signing');
+      // token 刷新失敗（網路問題或 auth 狀態損壞） → 完整 re-auth
+      try {
+        await FirebaseAuth.instance.signOut();
+        await AuthService.signInAnonymouslyIfNeeded();
+        final retryUser = FirebaseAuth.instance.currentUser;
+        if (retryUser == null) return false;
+        final retryToken = await retryUser.getIdToken(true);
+        return retryToken != null && retryToken.isNotEmpty;
+      } catch (e2) {
+        FirebaseService.log('StickerGenerationService: re-auth also failed: $e2');
+        return false;
+      }
+    }
   }
 
   // ─── private ────────────────────────────────────────────────────────────
