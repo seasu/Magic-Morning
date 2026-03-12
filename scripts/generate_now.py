@@ -7,6 +7,7 @@ from google import genai
 from google.genai import types
 
 API_KEY = os.environ["GEMINI_API_KEY"]
+IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
 OUT_DIR = Path(__file__).parent.parent / "assets" / "images"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -51,14 +52,14 @@ STYLES = {
     ),
 }
 
-print("🐱 Generating 6 style preview images with Gemini...\n")
+print(f"🐱 Generating 6 style preview images with Gemini ({IMAGE_MODEL})...\n")
 results = {}
 
 for style_key, prompt in STYLES.items():
     print(f"  🎨 {style_key}...", end=" ", flush=True)
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash-preview-image-generation",
+            model=IMAGE_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_modalities=["image"],
