@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError, CallableRequest} from "firebase-functions/v2/https";
 import {defineSecret, defineString} from "firebase-functions/params";
+import {log, warn} from "firebase-functions/logger";
 
 admin.initializeApp();
 
@@ -14,6 +15,48 @@ const geminiImageModel = defineString("GEMINI_IMAGE_MODEL", {
   default: "gemini-2.5-flash-image",
   description: "Gemini model for image generation",
 });
+
+// ── auth helper ──────────────────────────────────────────────────────────────
+
+/**
+ * 取得已驗證的 UID。
+ *
+ * 優先使用 SDK 內建的 request.auth；若為 null（v2 callable 已知 edge case），
+ * 則手動從 Authorization header 解析並驗證 ID token。
+ */
+async function resolveUid(request: CallableRequest): Promise<string> {
+  if (request.auth) {
+    return request.auth.uid;
+  }
+
+  // request.auth is null — try manual fallback
+  const authHeader = request.rawRequest?.headers?.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    warn("resolveUid: no auth header found", {
+      hasRawRequest: !!request.rawRequest,
+      headers: request.rawRequest?.headers
+        ? Object.keys(request.rawRequest.headers)
+        : [],
+    });
+    throw new HttpsError(
+      "unauthenticated",
+      "No Authorization header. Please sign in."
+    );
+  }
+
+  const idToken = authHeader.split("Bearer ")[1];
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    log("resolveUid: manual token verify OK", {uid: decoded.uid});
+    return decoded.uid;
+  } catch (e) {
+    warn("resolveUid: manual token verify failed", {error: String(e)});
+    throw new HttpsError(
+      "unauthenticated",
+      `Token verification failed: ${String(e).slice(0, 200)}`
+    );
+  }
+}
 
 // ── creditHistory helper ─────────────────────────────────────────────────────
 
@@ -49,11 +92,11 @@ export const generateStickerSpecs = onCall(
     timeoutSeconds: 60,
     memory: "512MiB",
     secrets: [geminiApiKey],
+    invoker: "public",
   },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Login required.");
-    }
+    const uid = await resolveUid(request);
+    log("generateStickerSpecs: auth OK", {uid});
 
     const {photoBase64} = request.data as {photoBase64: string};
 
@@ -148,13 +191,12 @@ export const generateStickerImage = onCall(
     timeoutSeconds: 120,
     memory: "1GiB",
     secrets: [geminiApiKey],
+    invoker: "public",
   },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Login required.");
-    }
+    const uid = await resolveUid(request);
+    log("generateStickerImage: auth OK", {uid});
 
-    const uid = request.auth.uid;
     const {photoBase64, prompt} = request.data as {
       photoBase64: string;
       prompt: string;
@@ -303,7 +345,7 @@ export const generateStickerImage = onCall(
 // Debug 用：回傳目前部署的 model 設定（不需 Auth）
 
 export const getConfig = onCall(
-  {region: "asia-east1", timeoutSeconds: 10, memory: "128MiB"},
+  {region: "asia-east1", timeoutSeconds: 10, memory: "128MiB", invoker: "public"},
   () => ({
     textModel: geminiTextModel.value(),
     imageModel: geminiImageModel.value(),
