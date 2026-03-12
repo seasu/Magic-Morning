@@ -216,10 +216,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   void _reject() => setState(() => _currentIndex++);
 
-  void _openEditSheet() {
+  void _openEditSheet(int idx) {
     final state = ref.read(editorStateProvider(widget.imagePath));
     final notifier = ref.read(editorStateProvider(widget.imagePath).notifier);
-    final idx = _currentIndex;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -325,67 +324,65 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final isReady = state.status == EditorStatus.ready;
     final isDone = isReady && _currentIndex >= 8;
 
-    // 當前張 AI 圖片仍在生成中（null = loading，sentinel = 尚未觸發生成）
-    final isCurrentImageLoading = isReady &&
-        !isDone &&
-        state.generatedImages[_currentIndex] == null;
-
     return Scaffold(
       backgroundColor: _kBg,
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            // ── 主畫面內容 ─────────────────────────────────────────────
-            Column(
-              children: [
-                // ── 頂部列 ──────────────────────────────────────────────
-                _TopBar(
-                  onBack: () => context.go('/'),
-                  onRefresh: (isReady && !isDone) ? _regenerate : null,
-                ),
-
-                if (isLoading)
-                  const Expanded(child: _FunLoadingView())
-                else if (state.errorMessage != null)
-                  Expanded(child: _ErrorView(message: state.errorMessage!))
-                else if (isDone)
-                  Expanded(
-                    child: _CompletionView(
-                      keptCount: _keptCount,
-                      onRegenerate: _regenerate,
-                      onFinish: () => context.go('/'),
-                    ),
-                  )
-                else if (isReady) ...[
-                  // ── 卡片層疊 ──────────────────────────────────────────
-                  Expanded(
-                    child: _CardStack(
-                      state: state,
-                      currentIndex: _currentIndex,
-                      repaintKeys: _repaintKeys,
-                      cardController: _cardController,
-                      onAccepted: _accept,
-                      onRejected: _reject,
-                      onEdit: _openEditSheet,
-                      onRetry: () => _generateImage(_currentIndex),
-                      stickerShape: state.stickerShape,
-                    ),
-                  ),
-
-                  // ── 底部按鈕 ──────────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: _buildBottomButton(state.generatedImages[_currentIndex]),
-                  ),
-                ],
-              ],
+            // ── 頂部列 ──────────────────────────────────────────────────
+            _TopBar(
+              onBack: () => context.go('/'),
+              title: state.phase == EditorPhase.confirm ? '預覽貼圖' : '選擇貼圖',
+              onRefresh: (isReady && !isDone) ? _regenerate : null,
             ),
 
-            // ── 圖片生成中：全畫面貓追老鼠遮罩（鎖定操作）───────────────
-            if (isCurrentImageLoading)
-              const AbsorbPointer(
-                child: _FunLoadingView(),
-              ),
+            if (isLoading)
+              const Expanded(child: _FunLoadingView())
+            else if (state.errorMessage != null)
+              Expanded(child: _ErrorView(message: state.errorMessage!))
+            else if (isDone)
+              Expanded(
+                child: _CompletionView(
+                  keptCount: _keptCount,
+                  onRegenerate: _regenerate,
+                  onFinish: () => context.go('/'),
+                ),
+              )
+            else if (isReady) ...[
+              if (state.phase == EditorPhase.confirm)
+                // ── 確認預覽階段：素材預覽 + 點數確認 CTA ──────────────
+                Expanded(
+                  child: _ConfirmPanel(
+                    state: state,
+                    onConfirm: (count) => ref
+                        .read(editorStateProvider(widget.imagePath).notifier)
+                        .startBatchGeneration(count),
+                    onEdit: (idx) => _openEditSheet(idx),
+                  ),
+                )
+              else ...[
+                // ── 滑卡選擇階段：Tinder 滑卡 ──────────────────────────
+                Expanded(
+                  child: _CardStack(
+                    state: state,
+                    currentIndex: _currentIndex,
+                    repaintKeys: _repaintKeys,
+                    cardController: _cardController,
+                    onAccepted: _accept,
+                    onRejected: _reject,
+                    onEdit: () => _openEditSheet(_currentIndex),
+                    onRetry: () => _generateImage(_currentIndex),
+                    stickerShape: state.stickerShape,
+                  ),
+                ),
+
+                // ── 底部按鈕 ────────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: _buildBottomButton(state.generatedImages[_currentIndex]),
+                ),
+              ],
+            ],
           ],
         ),
       ),
@@ -398,8 +395,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 class _TopBar extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback? onRefresh;
+  final String title;
 
-  const _TopBar({required this.onBack, this.onRefresh});
+  const _TopBar({required this.onBack, this.onRefresh, this.title = '選擇貼圖'});
 
   @override
   Widget build(BuildContext context) {
@@ -413,8 +411,8 @@ class _TopBar extends StatelessWidget {
             style: IconButton.styleFrom(foregroundColor: Colors.black87),
           ),
           const Spacer(),
-          const Text(
-            '選擇貼圖',
+          Text(
+            title,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w700,
@@ -1466,6 +1464,233 @@ class _ChaseStage extends StatelessWidget {
         ],
       );
     });
+  }
+}
+
+// ─── 確認預覽面板 ──────────────────────────────────────────────────────────────
+//
+// Spec 生成完畢後顯示的第一個畫面。
+// 使用者可左右滑動預覽 8 張素材貼圖（背景色 + 去背主角 + AI 文字），
+// 點擊鉛筆圖示可編輯文字 / 配色，確認後點擊底部 CTA 開始批次 AI 生成。
+
+class _ConfirmPanel extends ConsumerStatefulWidget {
+  final EditorState state;
+  final void Function(int count) onConfirm;
+  final void Function(int index) onEdit;
+
+  const _ConfirmPanel({
+    required this.state,
+    required this.onConfirm,
+    required this.onEdit,
+  });
+
+  @override
+  ConsumerState<_ConfirmPanel> createState() => _ConfirmPanelState();
+}
+
+class _ConfirmPanelState extends ConsumerState<_ConfirmPanel> {
+  final _pageController = PageController(viewportFraction: 0.88);
+  int _previewIndex = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final credits = ref.watch(creditProvider);
+    final canGenerate = min(credits, 8);
+
+    return Column(
+      children: [
+        // ── PageView 預覽 8 張素材貼圖 ────────────────────────────────────
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: 8,
+            onPageChanged: (i) => setState(() => _previewIndex = i),
+            itemBuilder: (_, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              child: _StickerCard(
+                subjectBytes: widget.state.subjectBytes,
+                generatedImage: widget.state.generatedImages[i],
+                text: widget.state.stickerTexts[i],
+                config: kStickerConfigs[widget.state.colorSchemeIndices[i]],
+                initialScale: widget.state.imageScales[i],
+                initialOffset: widget.state.imageOffsets[i],
+                initialImageAngle: widget.state.imageAngles[i],
+                fontIndex: widget.state.fontIndices[i],
+                fontSizeScale: widget.state.fontSizeScales[i],
+                textXAlign: widget.state.textXAligns[i],
+                textYAlign: widget.state.textYAligns[i],
+                textAngle: widget.state.textAngles[i],
+                onTap: () => widget.onEdit(i),
+                stickerShape: widget.state.stickerShape,
+              ),
+            ),
+          ),
+        ),
+
+        // ── 頁面指示點 ────────────────────────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(8, (i) {
+            final active = _previewIndex == i;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: active ? 14 : 6,
+              height: 6,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              decoration: BoxDecoration(
+                color: active
+                    ? const Color(0xFFFD297B)
+                    : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '左右滑動預覽 · ✏️ 可編輯文字',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade500,
+          ),
+        ),
+
+        // ── 底部 CTA ──────────────────────────────────────────────────────
+        _ConfirmCTA(
+          credits: credits,
+          canGenerate: canGenerate,
+          onConfirm: widget.onConfirm,
+        ),
+      ],
+    );
+  }
+}
+
+// ── 確認 CTA：根據點數智能顯示生成按鈕 ──────────────────────────────────────────
+
+class _ConfirmCTA extends ConsumerWidget {
+  final int credits;
+  final int canGenerate;
+  final void Function(int count) onConfirm;
+
+  const _ConfirmCTA({
+    required this.credits,
+    required this.canGenerate,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (canGenerate > 0) ...[
+            // ── 主要生成按鈕 ───────────────────────────────────────────
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                onConfirm(canGenerate);
+              },
+              child: Container(
+                width: double.infinity,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: AppColors.gradient,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        canGenerate >= 8
+                            ? '生成全部 8 張 · $canGenerate 點'
+                            : '生成前 $canGenerate 張 · $canGenerate 點',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── 點數不足時顯示補充入口 ──────────────────────────────────
+            if (credits < 8) ...[
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () => CreditPaywallDialog.show(context, ref),
+                child: Text(
+                  '點數不足（$credits/8）· 點此補充',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ] else ...[
+            // ── 點數為 0：只顯示補充點數 ──────────────────────────────
+            Text(
+              '點數不足，無法生成貼圖',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => CreditPaywallDialog.show(context, ref),
+              child: Container(
+                width: double.infinity,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Center(
+                  child: Text(
+                    '⚡ 補充點數',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

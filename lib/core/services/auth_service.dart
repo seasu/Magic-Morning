@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -6,9 +7,9 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'firebase_service.dart';
 import '../../features/billing/models/credit_history_entry.dart';
 
-/// 點數常數
+/// 點數常數（UI 顯示用；實際點數由 Cloud Function 的 defineString 控制）
 const int kGuestInitialCredits = 1;      // 訪客初始點數（刻意給少，降低重裝誘因）
-const int kLoginBonusCredits = 7;        // 登入獎勵（升級訪客 → 正式帳號）
+const int kLoginBonusCredits = 7;        // 登入獎勵顯示值（server 值同步於 LOGIN_BONUS_CREDITS）
 const int kNewAccountCredits = 5;        // 全新帳號初始點數
 
 /// Firebase Auth + Firestore 用戶管理服務
@@ -177,10 +178,9 @@ class AuthService {
     // 訪客升級：嘗試 link
     if (currentUser != null && currentUser.isAnonymous) {
       try {
-        final anonCredits = (await getCredits(currentUser.uid)) ?? 0;
         await currentUser.linkWithCredential(credential);
-        // 升級成功：同一 UID，給登入獎勵（若已升級過不重複給）
-        await _promoteUser(currentUser.uid, previousCredits: anonCredits);
+        // 升級成功：同一 UID，呼叫 CF 補發登入獎勵（若已升級過 CF 會 idempotent 跳過）
+        await _promoteUser(currentUser.uid);
         FirebaseService.log(
           'AuthService: anonymous upgraded uid=${currentUser.uid}',
         );
@@ -191,7 +191,7 @@ class AuthService {
           rethrow;
         }
         // 現有帳號 → 切換過去並合併點數
-        final anonCredits = (await getCredits(currentUser.uid)) ?? 0;
+        final anonCredits = (await getCredits(currentUser.uid)) ?? 0; // 合併用
         await _auth.signInWithCredential(
             e.credential ?? credential,
         );
@@ -237,25 +237,21 @@ class AuthService {
     );
   }
 
-  /// 訪客升級：標記為非匿名，補發登入獎勵點數
-  static Future<void> _promoteUser(String uid, {required int previousCredits}) async {
-    final ref = _userDoc(uid);
-    await _db.runTransaction((tx) async {
-      final doc = await tx.get(ref);
-      final data = doc.data() ?? {};
-      if (data['isAnonymous'] != true) return; // 已升級過，不重複
-
-      // 在現有點數基礎上累加登入獎勵
-      final currentCredits = (data['credits'] as int?) ?? previousCredits;
-      tx.update(ref, {
-        'credits': currentCredits + kLoginBonusCredits,
-        'isAnonymous': false,
-        'promotedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      // NOTE: creditHistory writes are reserved for Cloud Functions only.
-    });
-    FirebaseService.log('AuthService: user promoted uid=$uid +$kLoginBonusCredits credits');
+  /// 訪客升級：呼叫 Cloud Function `promoteUser`，server 端原子性補發登入獎勵
+  ///
+  /// 點數實際值由 Cloud Function 的 `LOGIN_BONUS_CREDITS` defineString 控制。
+  static Future<void> _promoteUser(String uid) async {
+    try {
+      final fn = FirebaseFunctions.instanceFor(region: 'asia-east1');
+      final result = await fn.httpsCallable('promoteUser').call<Map<String, dynamic>>({});
+      final data = result.data;
+      final bonusGranted = data['bonusGranted'] as int? ?? 0;
+      FirebaseService.log(
+        'AuthService: user promoted via CF uid=$uid +$bonusGranted credits',
+      );
+    } catch (e, stack) {
+      await FirebaseService.recordError(e, stack, reason: 'promote_user_cf_failed');
+    }
   }
 }
 

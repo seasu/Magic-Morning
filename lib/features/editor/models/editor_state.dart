@@ -11,6 +11,12 @@ enum EditorStatus {
   exporting,
 }
 
+/// Editor 的使用階段（在 status == ready 時生效）
+///
+///   confirm  — Spec 剛生成完，顯示 8 張素材預覽 + 點數確認 CTA
+///   swiping  — 批次生成已啟動，進入 Tinder 滑卡選擇模式
+enum EditorPhase { confirm, swiping }
+
 const _kFallbackTexts = [
   '哈囉！', '太棒了！', '真的嗎？', '尷尬了...',
   '哼！', '開心！', '我想想...', '再見囉！',
@@ -23,6 +29,8 @@ class EditorState {
   final List<Uint8List?> generatedImages; // 8 張 Gemini 生成貼圖（null = 仍在生成）
   final List<String?> imageErrors;        // 對應每張的失敗原因（null = 無錯誤）
   final EditorStatus status;
+  final EditorPhase phase;                // 使用階段（confirm / swiping）
+  final int batchTarget;                  // 本次批次生成的目標張數（0 = 尚未確認）
   final String? errorMessage;
   final StickerShape stickerShape;        // 全域形狀：圓形 or 方形
   final List<int> colorSchemeIndices;     // 每張貼圖使用哪組配色 (0-7)
@@ -43,6 +51,8 @@ class EditorState {
     List<Uint8List?>? generatedImages,
     List<String?>? imageErrors,
     this.status = EditorStatus.idle,
+    this.phase = EditorPhase.swiping,
+    this.batchTarget = 0,
     this.errorMessage,
     this.stickerShape = StickerShape.circle,
     List<int>? colorSchemeIndices,
@@ -75,6 +85,8 @@ class EditorState {
     List<Uint8List?>? generatedImages,
     List<String?>? imageErrors,
     EditorStatus? status,
+    EditorPhase? phase,
+    int? batchTarget,
     String? errorMessage,
     StickerShape? stickerShape,
     List<int>? colorSchemeIndices,
@@ -95,6 +107,8 @@ class EditorState {
       generatedImages: generatedImages ?? this.generatedImages,
       imageErrors: imageErrors ?? this.imageErrors,
       status: status ?? this.status,
+      phase: phase ?? this.phase,
+      batchTarget: batchTarget ?? this.batchTarget,
       errorMessage: errorMessage,
       stickerShape: stickerShape ?? this.stickerShape,
       colorSchemeIndices: colorSchemeIndices ?? this.colorSchemeIndices,

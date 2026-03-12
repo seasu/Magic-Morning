@@ -15,6 +15,20 @@ const geminiImageModel = defineString("GEMINI_IMAGE_MODEL", {
   description: "Gemini model for image generation",
 });
 
+// ── 點數常數（可透過 Firebase Console 或 CLI 調整，無需重新發布 App）──────────
+const loginBonusCredits = defineString("LOGIN_BONUS_CREDITS", {
+  default: "7",
+  description: "Credits granted when anonymous user upgrades to a real account",
+});
+const newAccountCredits = defineString("NEW_ACCOUNT_CREDITS", {
+  default: "5",
+  description: "Credits granted for brand-new (non-anonymous) accounts",
+});
+const guestInitialCredits = defineString("GUEST_INITIAL_CREDITS", {
+  default: "1",
+  description: "Credits granted for new anonymous (guest) accounts",
+});
+
 // ── creditHistory helper ─────────────────────────────────────────────────────
 
 function writeCreditHistory(
@@ -298,6 +312,59 @@ export const generateStickerImage = onCall(
   }
 );
 
+// ── promoteUser ──────────────────────────────────────────────────────────────
+//
+// 訪客帳號升級為真實帳號時呼叫（Dart 端 linkWithCredential 成功後）。
+// 1. 驗證 Firebase Auth（已登入）
+// 2. Firestore Transaction：
+//    a. 若 isAnonymous != true → 已升級過，idempotent，直接回傳目前點數
+//    b. 否則：累加 LOGIN_BONUS_CREDITS、標記 isAnonymous: false、寫 creditHistory
+
+export const promoteUser = onCall(
+  {region: "asia-east1", timeoutSeconds: 30, memory: "256MiB"},
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Login required.");
+    }
+
+    const uid = request.auth.uid;
+    const bonus = parseInt(loginBonusCredits.value(), 10);
+    const userRef = db.collection("users").doc(uid);
+
+    return db.runTransaction(async (tx) => {
+      const doc = await tx.get(userRef);
+      if (!doc.exists) {
+        throw new HttpsError("not-found", "User document not found.");
+      }
+
+      const data = doc.data()!;
+
+      // 已升級過：直接回傳目前點數（idempotent）
+      if (data["isAnonymous"] !== true) {
+        return {credits: data["credits"] as number, bonusGranted: 0};
+      }
+
+      const currentCredits = (data["credits"] as number) ?? 0;
+      const newCredits = currentCredits + bonus;
+
+      tx.update(userRef, {
+        credits: newCredits,
+        isAnonymous: false,
+        promotedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      writeCreditHistory(tx, uid, {
+        type: "earned",
+        amount: bonus,
+        reason: "login_bonus",
+      });
+
+      return {credits: newCredits, bonusGranted: bonus};
+    });
+  }
+);
+
 // ── getConfig ────────────────────────────────────────────────────────────────
 //
 // Debug 用：回傳目前部署的 model 設定（不需 Auth）
@@ -307,5 +374,8 @@ export const getConfig = onCall(
   () => ({
     textModel: geminiTextModel.value(),
     imageModel: geminiImageModel.value(),
+    loginBonusCredits: loginBonusCredits.value(),
+    newAccountCredits: newAccountCredits.value(),
+    guestInitialCredits: guestInitialCredits.value(),
   })
 );

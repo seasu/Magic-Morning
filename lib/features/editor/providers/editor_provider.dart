@@ -67,6 +67,8 @@ class _EditorFamilyNotifier
       generatedImages: List.filled(8, _kNotGeneratedSentinel),
       imageErrors: List.filled(8, null),
       status: EditorStatus.ready,
+      phase: EditorPhase.confirm, // 進入確認預覽階段
+      batchTarget: 0,
     );
   }
 
@@ -84,7 +86,12 @@ class _EditorFamilyNotifier
       final specs = await GeminiService().generateStickerSpecs(resized);
       _specs = specs;
       final texts = _specs!.map((s) => s.text).toList();
-      state = state.copyWith(stickerTexts: texts, status: EditorStatus.ready);
+      state = state.copyWith(
+        stickerTexts: texts,
+        status: EditorStatus.ready,
+        phase: EditorPhase.confirm, // 重生成後也回到確認預覽
+        batchTarget: 0,
+      );
     } catch (e, stack) {
       await FirebaseService.recordError(e, stack, reason: 'editor_regen_failed');
       state = state.copyWith(status: EditorStatus.ready);
@@ -246,6 +253,23 @@ class _EditorFamilyNotifier
   /// 重新生成指定索引的 AI 貼圖（單張重試，扣 1 點）
   Future<void> retryImageGeneration(int index) async {
     await generateSingleImage(index);
+  }
+
+  /// 使用者在確認畫面點擊「生成 N 張」後呼叫。
+  ///
+  /// 立即切換至 [EditorPhase.swiping]，然後依序生成前 [count] 張貼圖。
+  /// 若中途點數不足（'insufficient'），停止批次；剩餘卡片維持 sentinel，
+  /// 使用者可在滑卡模式中透過「生成 · 1點」按鈕個別補充生成。
+  Future<void> startBatchGeneration(int count) async {
+    if (count <= 0) return;
+    state = state.copyWith(
+      phase: EditorPhase.swiping,
+      batchTarget: count,
+    );
+    for (int i = 0; i < count; i++) {
+      final result = await generateSingleImage(i);
+      if (result == 'insufficient') break;
+    }
   }
 
   // ─── private ────────────────────────────────────────────
