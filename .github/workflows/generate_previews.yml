@@ -52,7 +52,7 @@ jobs:
         if: steps.check.outputs.needs_generation == '1'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-preview-05-20' }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image' }}
         run: python3 scripts/generate_style_previews_ci.py
 
       - name: Commit generated images
