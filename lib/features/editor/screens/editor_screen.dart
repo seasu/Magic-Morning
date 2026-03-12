@@ -300,10 +300,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   /// 依圖片狀態決定底部按鈕：
   ///   sentinel(length=1)  → 尚未生成  → 顯示「生成·1點」
   ///   null                → 生成中    → 隱藏（全畫面 loading 覆蓋）
-  ///   empty(length=0)     → 生成失敗  → 顯示「重新生成·1點」（不顯示儲存）
+  ///   empty(length=0)     → 生成失敗  → 隱藏（_FailedOverlay 內建重試，不扣點）
   ///   bytes(length>1)     → 成功      → 顯示「儲存貼圖」
   Widget _buildBottomButton(Uint8List? img) {
-    if (isNotGeneratedSentinel(img) || (img != null && img.isEmpty)) {
+    if (img != null && img.isEmpty) return const SizedBox.shrink(); // 失敗：overlay 處理重試
+    if (isNotGeneratedSentinel(img)) {
       return _GenerateButton(
         onTap: _isExporting ? null : () => _generateImage(_currentIndex),
       );
@@ -664,10 +665,11 @@ class _StickerCard extends StatelessWidget {
   }
 }
 
-// ─── 生成失敗：大型居中覆蓋層 ─────────────────────────────────────────────────
+// ─── 生成失敗：磨砂玻璃覆蓋層 ────────────────────────────────────────────────
 
-/// 圖片生成失敗時，蓋在整張卡片上的全屏錯誤提示。
-/// 點擊整個覆蓋層即可重試；長按（debug only）顯示原始錯誤。
+/// 圖片生成失敗時，蓋在整張卡片上的友善錯誤提示。
+/// 磨砂玻璃背景保留卡片背景紋理感；點擊重試按鈕不扣點（CF 已退還）。
+/// 長按（debug only）顯示原始錯誤訊息。
 class _FailedOverlay extends StatelessWidget {
   final String? reason;
   final VoidCallback? onRetry;
@@ -678,10 +680,6 @@ class _FailedOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        onRetry?.call();
-      },
       onLongPress: reason == null
           ? null
           : () => showDialog<void>(
@@ -698,69 +696,96 @@ class _FailedOverlay extends StatelessWidget {
                   ],
                 ),
               ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xCC1A1A1A),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 圖標
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: Colors.red.shade400.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.error_outline_rounded,
-                  size: 40,
-                  color: Colors.red.shade300,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // 主標題
-              const Text(
-                'AI 生成失敗',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              // 重試按鈕樣式
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 圖標
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFF0F3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome_outlined,
+                      size: 36,
+                      color: Color(0xFFFF5864),
+                    ),
                   ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      '點此重試',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                  const SizedBox(height: 16),
+                  // 主標題
+                  const Text(
+                    '生成失敗',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // 副標題：說明不扣點
+                  const Text(
+                    '點數已退還，免費重試',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // 重試按鈕
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      onRetry?.call();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 28, vertical: 13),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.gradient,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFF5864).withValues(alpha: 0.35),
+                            blurRadius: 14,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh_rounded,
+                              size: 18, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text(
+                            '重新生成',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
