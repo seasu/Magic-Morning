@@ -698,7 +698,7 @@ class _FailedOverlay extends StatelessWidget {
               ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: ui.BackdropFilter(
+        child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
