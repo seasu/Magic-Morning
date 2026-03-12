@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | MagicMorning（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v3.1.15+136 |
+| 目前版本 | v3.1.16+137 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash Exp Image Generation（圖片生成）|
@@ -207,6 +207,7 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.16 | 2026-03-12 | **Bug fix**：修正 Google 登入後三個問題：(1) `_promoteUser` 點數計算由 `max(原有, 5)` 改為 `原有 + 5`，確保 100 點登入後變 105；(2) `authStateProvider` 改用 `userChanges()` 取代 `authStateChanges()`，確保 `linkWithCredential` 後 `isAnonymous` 狀態即時更新，CreditBadge 正確顯示使用者頭像；(3) `CreditNotifier` 新增 `isAnonymous` 改變時觸發重新載入，解決 linkWithCredential 同一 UID 升級後點數未刷新；(4) `_handleSuccess` 新增 `creditProvider.reload()` 明確重新讀取 Firestore 點數，防止 timing race condition |
 | v3.1.15 | 2026-03-11 | **Bug fix**：移除 `AuthService` 中所有從客戶端寫入 `creditHistory` 的呼叫（`_ensureUserDoc`、`addCredits`、`_promoteUser`）；`creditHistory` 寫入依架構設計僅由 Cloud Functions 處理，客戶端只有 read 權限，導致 Firestore `permission-denied` 被誤標為 `anon_sign_in_failed`；新增 `ensure_user_doc_failed` 獨立 Crashlytics 錯誤標籤，將 auth 失敗與 Firestore 失敗分開追蹤 |
 | v3.1.14 | 2026-03-11 | **CI fix**：`generate_style_previews_ci.py` 將廢棄的 `gemini-2.0-flash-preview-image-generation` 改為 `gemini-2.0-flash-exp-image-generation`，修正所有 6 種風格圖生成均返回 404 NOT_FOUND 的問題 |
 | v3.1.9 | 2026-03-11 | **CI fix**：移除 `editor_screen.dart` 中未使用的 `_kNopeColor` 常數與 `_CircleButton`/`_CircleButtonState` 死碼，修正 `dart analyze --fatal-infos` 的 5 個 `unused_element`/`unused_element_parameter` 警告 |

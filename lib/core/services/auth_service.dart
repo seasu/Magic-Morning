@@ -245,10 +245,8 @@ class AuthService {
       final data = doc.data() ?? {};
       if (data['isAnonymous'] != true) return; // 已升級過，不重複
 
-      // 升級到登入點數（kLoginBonusCredits），若原有點數更多則保留
-      final newCredits = previousCredits < kLoginBonusCredits
-          ? kLoginBonusCredits
-          : previousCredits;
+      // 原有點數 + 登入獎勵
+      final newCredits = previousCredits + kLoginBonusCredits;
       tx.update(ref, {
         'credits': newCredits,
         'isAnonymous': false,

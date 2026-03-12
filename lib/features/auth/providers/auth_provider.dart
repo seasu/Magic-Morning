@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// `null` = 未登入（理論上 app 啟動後會立即建立匿名帳號，不應長時間為 null）
 final authStateProvider = StreamProvider<User?>((ref) {
-  return FirebaseAuth.instance.authStateChanges();
+  // userChanges() also emits when linkWithCredential / updateProfile occurs,
+  // unlike authStateChanges() which only fires on sign-in/sign-out.
+  return FirebaseAuth.instance.userChanges();
 });
 
 /// 目前登入的用戶（同步讀取，null = 尚未初始化）
