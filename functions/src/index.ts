@@ -92,6 +92,7 @@ export const generateStickerSpecs = onCall(
     timeoutSeconds: 60,
     memory: "512MiB",
     secrets: [geminiApiKey],
+    invoker: "public",
   },
   async (request) => {
     const uid = await resolveUid(request);
@@ -190,6 +191,7 @@ export const generateStickerImage = onCall(
     timeoutSeconds: 120,
     memory: "1GiB",
     secrets: [geminiApiKey],
+    invoker: "public",
   },
   async (request) => {
     const uid = await resolveUid(request);
@@ -343,7 +345,7 @@ export const generateStickerImage = onCall(
 // Debug 用：回傳目前部署的 model 設定（不需 Auth）
 
 export const getConfig = onCall(
-  {region: "asia-east1", timeoutSeconds: 10, memory: "128MiB"},
+  {region: "asia-east1", timeoutSeconds: 10, memory: "128MiB", invoker: "public"},
   () => ({
     textModel: geminiTextModel.value(),
     imageModel: geminiImageModel.value(),
