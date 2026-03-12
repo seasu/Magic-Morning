@@ -49,9 +49,11 @@ Future<void> main() async {
   await AdsService.instance.initialize();
 
   // 匿名登入（訪客模式）：確保每個用戶都有 Firebase UID
-  // iOS：Keychain 保存，重裝後 UID 不變 ✅
-  // Android：重裝後 UID 重置，訪客僅給 1 點（降低誘因）✅
   await AuthService.signInAnonymouslyIfNeeded();
+
+  // 強制刷新 ID token — Auth session 可能從上次 app launch 持久化，
+  // 但 ID token 1 小時過期。不刷新的話第一次 Cloud Function 呼叫就會 UNAUTHENTICATED。
+  await AuthService.ensureValidToken();
 
   runApp(const ProviderScope(child: MagicStickerApp()));
 }

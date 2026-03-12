@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 
 import '../models/sticker_spec.dart';
+import 'auth_service.dart';
 import 'firebase_service.dart';
 
 /// 8 組預設 fallback（Cloud Function 失敗時使用）
@@ -29,39 +30,60 @@ class GeminiService {
   Future<List<StickerSpec>> generateStickerSpecs(Uint8List imageBytes) async {
     FirebaseService.log('GeminiService.generateStickerSpecs: start');
 
-    try {
-      final callable = _fn.httpsCallable(
-        'generateStickerSpecs',
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 65)),
-      );
+    // 確保有有效的 auth session + token
+    await AuthService.ensureValidToken();
 
-      final result = await callable.call<Map<String, dynamic>>({
-        'photoBase64': base64Encode(imageBytes),
-      });
+    const maxRetries = 2;
 
-      final data = result.data;
-      final rawSpecs = (data['specs'] as List).cast<Map<String, dynamic>>();
-      final specs = rawSpecs.take(8).map(StickerSpec.fromJson).toList();
+    for (int attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        final callable = _fn.httpsCallable(
+          'generateStickerSpecs',
+          options: HttpsCallableOptions(timeout: const Duration(seconds: 65)),
+        );
 
-      FirebaseService.log('GeminiService.generateStickerSpecs: done');
-      await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_generated');
+        final result = await callable.call<Map<String, dynamic>>({
+          'photoBase64': base64Encode(imageBytes),
+        });
 
-      return specs;
-    } on FirebaseFunctionsException catch (e, stack) {
-      FirebaseService.log(
-        'GeminiService: Cloud Function error code=${e.code} msg=${e.message}',
-      );
-      await FirebaseService.recordError(
-        e, stack, reason: 'gemini_specs_fn_failed',
-      );
-      await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_fallback');
-      return _kFallbackSpecs.map(StickerSpec.fromJson).toList();
-    } catch (e, stack) {
-      await FirebaseService.recordError(
-        e, stack, reason: 'gemini_specs_unexpected_failed',
-      );
-      await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_fallback');
-      return _kFallbackSpecs.map(StickerSpec.fromJson).toList();
+        final data = result.data;
+        final rawSpecs = (data['specs'] as List).cast<Map<String, dynamic>>();
+        final specs = rawSpecs.take(8).map(StickerSpec.fromJson).toList();
+
+        FirebaseService.log('GeminiService.generateStickerSpecs: done');
+        await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_generated');
+
+        return specs;
+      } on FirebaseFunctionsException catch (e, stack) {
+        // UNAUTHENTICATED → refresh token and retry
+        if (e.code == 'unauthenticated' && attempt < maxRetries) {
+          FirebaseService.log(
+            'GeminiService: unauthenticated, refreshing token '
+            'attempt ${attempt + 1}/$maxRetries',
+          );
+          await Future.delayed(Duration(seconds: 1 << attempt));
+          await AuthService.signInAnonymouslyIfNeeded();
+          await AuthService.ensureValidToken();
+          continue;
+        }
+
+        FirebaseService.log(
+          'GeminiService: Cloud Function error code=${e.code} msg=${e.message}',
+        );
+        await FirebaseService.recordError(
+          e, stack, reason: 'gemini_specs_fn_failed',
+        );
+        await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_fallback');
+        return _kFallbackSpecs.map(StickerSpec.fromJson).toList();
+      } catch (e, stack) {
+        await FirebaseService.recordError(
+          e, stack, reason: 'gemini_specs_unexpected_failed',
+        );
+        await FirebaseAnalytics.instance.logEvent(name: 'ai_specs_fallback');
+        return _kFallbackSpecs.map(StickerSpec.fromJson).toList();
+      }
     }
+
+    return _kFallbackSpecs.map(StickerSpec.fromJson).toList();
   }
 }

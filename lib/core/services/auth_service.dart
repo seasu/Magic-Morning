@@ -45,6 +45,23 @@ class AuthService {
     }
   }
 
+  // ── Token 刷新 ─────────────────────────────────────────────────────────
+
+  /// 強制刷新目前用戶的 ID token（若有 session 的話）。
+  ///
+  /// Auth session 跨 app launch 持久化，但 ID token 1 小時過期。
+  /// 在呼叫 Cloud Function 前應確保 token 有效。
+  static Future<void> ensureValidToken() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      await user.getIdToken(true);
+      FirebaseService.log('AuthService: token refreshed uid=${user.uid}');
+    } catch (e) {
+      FirebaseService.log('AuthService: token refresh failed: $e');
+    }
+  }
+
   // ── Google 登入 ──────────────────────────────────────────────────────────
 
   /// 使用 Google 帳號登入（或升級訪客帳號）
