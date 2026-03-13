@@ -197,7 +197,7 @@ class StickerGenerationService {
 You are a professional LINE sticker illustrator. Draw ONE single circular sticker based on the person's face in the reference photo.
 
 DESIGN REQUIREMENTS:
-- A single large filled perfect circle, centered, occupying ~90% of the square canvas
+- A single large filled perfect circle, centered, occupying ~95% of the square canvas (nearly edge-to-edge)
 - The circle must be geometrically perfect (equal width and height)
 - Circle background color: ${spec.bgColor}
 - Character expression / pose: ${spec.emotion}

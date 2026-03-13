@@ -174,10 +174,12 @@ class _StickerCanvasState extends State<StickerCanvas> {
     super.didUpdateWidget(old);
 
     // 圖片首次到達時重置視角
+    // Gemini 產出的圓形貼圖圓圈約佔畫布 90–95%，以 1.12x 補足至填滿 ClipOval
     if (old.generatedImage == null && widget.generatedImage != null) {
       _imgOffset = Offset.zero;
-      _imgScale = 1.0;
+      _imgScale = 1.12;
       _imgAngle = 0.0;
+      widget.onTransformChanged?.call(_imgScale, _imgOffset, _imgAngle);
     }
 
     // 父層更新圖片 transform 時同步（popup 關閉後）
