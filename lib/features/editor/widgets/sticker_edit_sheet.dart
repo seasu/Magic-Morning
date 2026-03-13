@@ -215,10 +215,9 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
                       width: side,
                       height: side,
                       child: CustomPaint(
-                        foregroundPainter: const _BoundaryPainter(),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: StickerCanvas(
+                        foregroundPainter: _BoundaryPainter(stickerShape: widget.stickerShape),
+                        child: Builder(builder: (ctx) {
+                          final canvas = StickerCanvas(
                             subjectBytes: widget.subjectBytes,
                             generatedImage: widget.generatedImage,
                             text: _textCtrl.text,
@@ -244,8 +243,14 @@ class _StickerEditSheetState extends State<StickerEditSheet> {
                               });
                               widget.onTextGestureChanged(xAlign, yAlign, angle, scale);
                             },
-                          ),
-                        ),
+                          );
+                          return widget.stickerShape == StickerShape.circle
+                              ? ClipOval(child: canvas)
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: canvas,
+                                );
+                        }),
                       ),
                     ),
                   );
@@ -666,7 +671,8 @@ class _ModeButton extends StatelessWidget {
 // ─── 貼圖最大邊界虛線框 ───────────────────────────────────────────────────────
 
 class _BoundaryPainter extends CustomPainter {
-  const _BoundaryPainter();
+  final StickerShape stickerShape;
+  const _BoundaryPainter({required this.stickerShape});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -677,13 +683,15 @@ class _BoundaryPainter extends CustomPainter {
 
     const dashLen = 5.0;
     const gapLen = 4.0;
-    const radius = 16.0;
 
-    final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        const Radius.circular(radius),
-      ));
+    final path = stickerShape == StickerShape.circle
+        ? (Path()
+          ..addOval(Rect.fromLTWH(0, 0, size.width, size.height)))
+        : (Path()
+          ..addRRect(RRect.fromRectAndRadius(
+            Rect.fromLTWH(0, 0, size.width, size.height),
+            const Radius.circular(16),
+          )));
 
     for (final metric in path.computeMetrics()) {
       double dist = 0;
@@ -696,5 +704,6 @@ class _BoundaryPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(covariant _BoundaryPainter old) =>
+      old.stickerShape != stickerShape;
 }

@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | Magic Sticker（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v3.1.62+183 |
+| 目前版本 | v3.1.63+184 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash Exp Image Generation（圖片生成）|
@@ -207,6 +207,7 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.63 | 2026-03-14 | **fix(edit)**：編輯畫面圓形貼圖改用圓形虛線框 — `_BoundaryPainter` 加入 `stickerShape` 參數，圓形時改畫 `addOval` 虛線；外層 ClipRRect 圓形時改為 `ClipOval`。 |
 | v3.1.62 | 2026-03-14 | **fix(cf)**：更新 `GEMINI_TEXT_MODEL` 預設值 `gemini-2.0-flash` → `gemini-2.5-flash`（2.0-flash 將於 2026-06-01 退役；`gemini-3-flash` 為不存在的 model ID，導致 404 錯誤）。 |
 | v3.1.61 | 2026-03-13 | **fix(canvas)**：編輯 popup 也套用 Auto-fit — `initState` 補上 `_autoFitGeneratedImage()` 呼叫，解決編輯畫面開啟時 `generatedImage` 已存在導致 `didUpdateWidget` 條件不觸發的問題。 |
 | v3.1.60 | 2026-03-13 | **feat(canvas)**：AI 圓形貼圖自動填滿畫布 — (1) Gemini Prompt 修正：圓圈改為填滿 100% 畫布、明確禁止任何顏色的描邊/外框；(2) `StickerCanvas` 新增 `_autoFitGeneratedImage()`：圖片首次到達時以 `compute()` 在 isolate 偵測非透明 bounding box，計算精確 scale（1.05× overshoot 裁掉殘留薄邊框），取代固定 `1.12×`。 |
