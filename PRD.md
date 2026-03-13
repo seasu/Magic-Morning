@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | Magic Sticker（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v3.1.64+185 |
+| 目前版本 | v3.1.65+186 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash Exp Image Generation（圖片生成）|
@@ -207,6 +207,7 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.65 | 2026-03-14 | **fix(billing)**：`creditHistoryProvider` 改為 `rethrow` 取代 `return []`，讓 Firestore 查詢失敗時 UI 正確顯示「載入失敗，請稍後再試」而非誤顯「還沒有點數紀錄」。 |
 | v3.1.64 | 2026-03-14 | **feat(loading)**：AI 生圖 loading 動畫改為「貓咪洗臉」— `_PaintStage` → `_GroomStage`：舔爪（0~18%）→ 橢圓軌跡洗臉（18~78%）→ 落爪＋✨閃光＋💕愛心上浮（78~100%）；背景改為 🫧 泡泡漂移；訊息同步更新為洗臉主題。 |
 | v3.1.63 | 2026-03-14 | **fix(edit)**：編輯畫面圓形貼圖改用圓形虛線框 — `_BoundaryPainter` 加入 `stickerShape` 參數，圓形時改畫 `addOval` 虛線；外層 ClipRRect 圓形時改為 `ClipOval`。 |
 | v3.1.62 | 2026-03-14 | **fix(cf)**：更新 `GEMINI_TEXT_MODEL` 預設值 `gemini-2.0-flash` → `gemini-2.5-flash`（2.0-flash 將於 2026-06-01 退役；`gemini-3-flash` 為不存在的 model ID，導致 404 錯誤）。 |
