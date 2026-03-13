@@ -434,24 +434,21 @@ class _StickerCanvasState extends State<StickerCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = constraints.maxWidth * 0.75;
+        final size = constraints.maxWidth;
         Widget img(String asset) => Image.asset(
               asset,
               width: size,
               height: size,
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Image.asset(
                 assetFallback,
                 width: size,
                 height: size,
-                fit: BoxFit.contain,
+                fit: BoxFit.cover,
               ),
             );
-        return Container(
-          color: Colors.white,
-          child: Center(
-            child: img(assetWithEmotion ?? assetFallback),
-          ),
+        return SizedBox.expand(
+          child: img(assetWithEmotion ?? assetFallback),
         );
       },
     );
