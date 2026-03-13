@@ -437,17 +437,21 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   ),
 
                   // ── 情感標籤 + 頁次 ───────────────────────────────────
-                  if (state.categoryIds.isNotEmpty &&
-                      _currentIndex < state.categoryIds.length &&
-                      state.categoryIds[_currentIndex].isNotEmpty)
+                  if (_currentIndex < state.selectedCategoryIds.length) ...[
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _EmotionLabel(
-                        categoryId: state.categoryIds[_currentIndex],
+                        // AI 已回傳 categoryId 用 AI 的，否則 fallback 用 selectedCategoryIds
+                        categoryId: (state.categoryIds.isNotEmpty &&
+                                _currentIndex < state.categoryIds.length &&
+                                state.categoryIds[_currentIndex].isNotEmpty)
+                            ? state.categoryIds[_currentIndex]
+                            : state.selectedCategoryIds[_currentIndex],
                         index: _currentIndex,
                         total: totalCount,
                       ),
                     ),
+                  ],
 
                   // ── 底部按鈕 ──────────────────────────────────────────
                   Padding(
@@ -645,6 +649,7 @@ class _CardStack extends StatelessWidget {
                 onTap: isGenerated ? onEdit : null,
                 stickerShape: stickerShape,
                 styleIndex: state.styleIndices[currentIndex],
+                categoryId: state.categoryIds[currentIndex],
               ),
 
               // ── 生成中 badge ──────────────────────────────────────────
@@ -689,6 +694,7 @@ class _StickerCard extends StatelessWidget {
   final VoidCallback? onTap;
   final StickerShape stickerShape;
   final int styleIndex;
+  final String categoryId;
 
   const _StickerCard({
     this.repaintKey,
@@ -707,6 +713,7 @@ class _StickerCard extends StatelessWidget {
     this.onTap,
     this.stickerShape = StickerShape.circle,
     this.styleIndex = 0,
+    this.categoryId = '',
   });
 
   @override
@@ -727,6 +734,7 @@ class _StickerCard extends StatelessWidget {
       onTap: onTap,
       stickerShape: stickerShape,
       styleIndex: styleIndex,
+      categoryId: categoryId,
     );
 
     final inner = repaintKey != null

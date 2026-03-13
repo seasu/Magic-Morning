@@ -61,6 +61,10 @@ class StickerCanvas extends StatefulWidget {
   /// 貼圖風格索引（對應 StickerStyle.values），用於未生成狀態的風格示意圖
   final int styleIndex;
 
+  /// 情感類別 id（對應 EmotionCategory.id），用於選擇 style×emotion 示意圖
+  /// 空字串時退而使用純風格示意圖（preview_{style}.png）
+  final String categoryId;
+
   /// true → 啟用選取模式（編輯 Sheet），false → 主卡片模式
   final bool enableTextGestures;
 
@@ -104,6 +108,7 @@ class StickerCanvas extends StatefulWidget {
     this.textYAlign = 0.85,
     this.textAngle = 0.0,
     this.styleIndex = 0,
+    this.categoryId = '',
     this.enableTextGestures = false,
     this.interactive = true,
     this.externalTarget,
@@ -421,19 +426,31 @@ class _StickerCanvasState extends State<StickerCanvas> {
   Widget _buildFallback() {
     final style = StickerStyle.values[
         widget.styleIndex.clamp(0, StickerStyle.values.length - 1)];
-    final previewAsset = 'assets/images/preview_${style.name}.png';
+    // 優先嘗試 style×emotion 示意圖，找不到則退回純風格示意圖
+    final assetWithEmotion = widget.categoryId.isNotEmpty
+        ? 'assets/images/preview_${style.name}_${widget.categoryId}.png'
+        : null;
+    final assetFallback = 'assets/images/preview_${style.name}.png';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.maxWidth * 0.75;
-        return Container(
-          color: Colors.white,
-          child: Center(
-            child: Image.asset(
-              previewAsset,
+        Widget img(String asset) => Image.asset(
+              asset,
               width: size,
               height: size,
               fit: BoxFit.contain,
-            ),
+              errorBuilder: (_, __, ___) => Image.asset(
+                assetFallback,
+                width: size,
+                height: size,
+                fit: BoxFit.contain,
+              ),
+            );
+        return Container(
+          color: Colors.white,
+          child: Center(
+            child: img(assetWithEmotion ?? assetFallback),
           ),
         );
       },
