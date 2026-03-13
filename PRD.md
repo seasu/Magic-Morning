@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | Magic Sticker（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v3.1.59+180 |
+| 目前版本 | v3.1.60+181 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash Exp Image Generation（圖片生成）|
@@ -207,6 +207,7 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.60 | 2026-03-13 | **feat(canvas)**：AI 圓形貼圖自動填滿畫布 — (1) Gemini Prompt 修正：圓圈改為填滿 100% 畫布、明確禁止任何顏色的描邊/外框；(2) `StickerCanvas` 新增 `_autoFitGeneratedImage()`：圖片首次到達時以 `compute()` 在 isolate 偵測非透明 bounding box，計算精確 scale（1.05× overshoot 裁掉殘留薄邊框），取代固定 `1.12×`。 |
 | v3.1.59 | 2026-03-13 | **chore**：merge main (v3.1.55+176) → `claude/fix-gemini-auth-errors-O28Sx`，解決 PR #129 版本衝突，版本遞增至 v3.1.59+180。 |
 | v3.1.55 | 2026-03-13 | **chore**：解決 PR #129 合併衝突（同步版本文件），更新 `pubspec.yaml` 與 `PRD.md` 版本號，確保分支可順利合併。 |
 | v3.1.51 | 2026-03-13 | **fix(ux)**：情感標籤 fallback + EmotionPickerSheet 捲動修復 — (1) `_EmotionLabel` 改為 fallback：AI 未回傳 categoryId（舊 CF 版本）時自動使用 `selectedCategoryIds[i]`，確保標籤永遠顯示；(2) `EmotionPickerSheet` 外層改為 `SingleChildScrollView`，防止 4×4 格在小螢幕溢出並確保確認按鈕可見；(3) 標題列選取數改為即時顯示「已選 N 種（4–12）」 |

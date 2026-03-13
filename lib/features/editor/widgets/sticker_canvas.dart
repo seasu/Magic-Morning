@@ -1,7 +1,9 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
 
 import '../../../core/models/sticker_shape.dart';
 import '../../../core/models/sticker_style.dart';
@@ -179,9 +181,10 @@ class _StickerCanvasState extends State<StickerCanvas> {
     // Gemini 產出的圓形貼圖圓圈約佔畫布 90–95%，以 1.12x 補足至填滿 ClipOval
     if (old.generatedImage == null && widget.generatedImage != null) {
       _imgOffset = Offset.zero;
-      _imgScale = 1.12;
+      _imgScale = 1.12; // temporary default；isolate 計算完後會更新
       _imgAngle = 0.0;
       widget.onTransformChanged?.call(_imgScale, _imgOffset, _imgAngle);
+      _autoFitGeneratedImage(widget.generatedImage!);
     }
 
     // 父層更新圖片 transform 時同步（popup 關閉後）
@@ -210,6 +213,43 @@ class _StickerCanvasState extends State<StickerCanvas> {
         setState(() => _textSizeScale = widget.fontSizeScale);
       }
     }
+  }
+
+  // ── Auto-fit: 偵測非透明 bounding box，縮放至填滿畫布 ──────────────────────
+
+  /// 在 isolate 中執行（透過 compute）。回傳 [minX, minY, maxX, maxY, imageWidth]。
+  static List<int>? _findContentBounds(Uint8List bytes) {
+    final image = img.decodeImage(bytes);
+    if (image == null) return null;
+    final data = image.getBytes(order: img.ChannelOrder.rgba);
+    final w = image.width;
+    final h = image.height;
+    int minX = w, maxX = 0, minY = h, maxY = 0;
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 10) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (minX >= maxX || minY >= maxY) return null;
+    return [minX, minY, maxX, maxY, w];
+  }
+
+  void _autoFitGeneratedImage(Uint8List bytes) {
+    compute(_findContentBounds, bytes).then((bounds) {
+      if (!mounted || bounds == null) return;
+      final contentSize =
+          max(bounds[2] - bounds[0], bounds[3] - bounds[1]).toDouble();
+      final fullSize = bounds[4].toDouble();
+      // 1.05× overshoot → 把任何殘留薄邊框推到 ClipOval 外面裁掉
+      final newScale = (fullSize / contentSize * 1.05).clamp(1.0, 3.0);
+      setState(() => _imgScale = newScale);
+      widget.onTransformChanged?.call(_imgScale, _imgOffset, _imgAngle);
+    });
   }
 
   // ── 手勢處理（統一 Handler）────────────────────────────────────────────────
