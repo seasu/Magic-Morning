@@ -1,7 +1,7 @@
-name: Generate Style Preview Images
+name: Generate Style×Emotion Preview Images
 
-# 一次性 workflow：使用 Gemini AI 生成 6 種風格貓咪示意圖並 commit 回 repo。
-# 成功執行一次後，可刪除此 workflow 與 scripts/generate_style_previews_ci.py。
+# 產生 6 種風格 × 16 種情感 = 96 張示意圖（preview_{style}_{emotion}.png）
+# 可手動觸發，也支援只產生部分組合以節省 API 用量。
 
 on:
   workflow_dispatch:
@@ -10,6 +10,14 @@ on:
         description: '強制重新生成（即使圖片已存在）'
         type: boolean
         default: false
+      styles:
+        description: '只產生指定風格（空格分隔，留空=全部）例：chibi pixel'
+        type: string
+        default: ''
+      emotions:
+        description: '只產生指定情感（空格分隔，留空=全部）例：greeting happy angry'
+        type: string
+        default: ''
 
 jobs:
   generate:
@@ -26,14 +34,25 @@ jobs:
       - name: Check if images already exist
         id: check
         run: |
-          STYLES="chibi popArt pixel sketch watercolor photo"
+          STYLES="${{ github.event.inputs.styles }}"
+          EMOTIONS="${{ github.event.inputs.emotions }}"
+          # 若未指定則用全量
+          if [ -z "$STYLES" ]; then
+            STYLES="chibi popArt pixel sketch watercolor photo"
+          fi
+          if [ -z "$EMOTIONS" ]; then
+            EMOTIONS="greeting praise surprise awkward angry happy thinking farewell shy cool tired cry love excited scared mischief"
+          fi
+
           MISSING=0
           for s in $STYLES; do
-            if [ ! -f "assets/images/preview_${s}.png" ] || \
-               [ "${{ github.event.inputs.force_regenerate }}" = "true" ]; then
-              MISSING=1
-              break
-            fi
+            for e in $EMOTIONS; do
+              if [ ! -f "assets/images/preview_${s}_${e}.png" ] || \
+                 [ "${{ github.event.inputs.force_regenerate }}" = "true" ]; then
+                MISSING=1
+                break 2
+              fi
+            done
           done
           echo "needs_generation=$MISSING" >> "$GITHUB_OUTPUT"
 
@@ -47,11 +66,13 @@ jobs:
         if: steps.check.outputs.needs_generation == '1'
         run: pip install google-genai -q
 
-      - name: Generate style preview images
+      - name: Generate style×emotion preview images
         if: steps.check.outputs.needs_generation == '1'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image' }}
+          PREVIEW_STYLES: ${{ github.event.inputs.styles }}
+          PREVIEW_EMOTIONS: ${{ github.event.inputs.emotions }}
         run: python3 scripts/generate_style_previews_ci.py
 
       - name: Create PR with generated images
@@ -78,15 +99,19 @@ jobs:
           git add pubspec.yaml PRD.md
           echo "📦 Version bumped: $CURRENT → $NEW_VER"
 
-          BRANCH="auto/style-previews-$(date +%Y%m%d-%H%M%S)"
+          BRANCH="auto/style-emotion-previews-$(date +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
-          git commit -m "feat: add AI-generated style preview images (v${NEW_VER})"
+          git commit -m "feat: add AI-generated style×emotion preview images (v${NEW_VER})"
           git push origin "$BRANCH"
           gh pr create \
             --base main \
             --head "$BRANCH" \
-            --title "feat: add AI-generated style preview images" \
-            --body "由 **Generate Style Preview Images** workflow 自動產生。\n\n包含 6 種風格示意圖（chibi / popArt / pixel / sketch / watercolor / photo）。"
+            --title "feat: add AI-generated style×emotion preview images" \
+            --body "由 **Generate Style×Emotion Preview Images** workflow 自動產生。
+
+包含 6 種風格 × 16 種情感 = 96 張示意圖（\`preview_{style}_{emotion}.png\`）。
+
+Prompt 格式與 App 實際產圖一致，示意圖呈現效果忠實反映正式貼圖風格。"
           echo "✅ PR created from branch $BRANCH"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

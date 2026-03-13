@@ -649,6 +649,7 @@ class _CardStack extends StatelessWidget {
                 onTap: isGenerated ? onEdit : null,
                 stickerShape: stickerShape,
                 styleIndex: state.styleIndices[currentIndex],
+                categoryId: state.categoryIds[currentIndex],
               ),
 
               // ── 生成中 badge ──────────────────────────────────────────
@@ -693,6 +694,7 @@ class _StickerCard extends StatelessWidget {
   final VoidCallback? onTap;
   final StickerShape stickerShape;
   final int styleIndex;
+  final String categoryId;
 
   const _StickerCard({
     this.repaintKey,
@@ -711,6 +713,7 @@ class _StickerCard extends StatelessWidget {
     this.onTap,
     this.stickerShape = StickerShape.circle,
     this.styleIndex = 0,
+    this.categoryId = '',
   });
 
   @override
@@ -731,6 +734,7 @@ class _StickerCard extends StatelessWidget {
       onTap: onTap,
       stickerShape: stickerShape,
       styleIndex: styleIndex,
+      categoryId: categoryId,
     );
 
     final inner = repaintKey != null
