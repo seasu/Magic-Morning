@@ -222,7 +222,7 @@ def build_prompt(style_key: str, emotion_key: str) -> str:
         "You are a professional LINE sticker illustrator. "
         "Draw ONE single circular sticker based on the person's face in the reference photo.\n\n"
         "DESIGN REQUIREMENTS:\n"
-        "- A single large filled perfect circle, centered, occupying ~90% of the square canvas\n"
+        "- A single large filled perfect circle, centered, occupying ~95% of the square canvas (nearly edge-to-edge)\n"
         "- The circle must be geometrically perfect (equal width and height)\n"
         f"- Circle background color: {emotion['bgColor']}\n"
         f"- Character expression / pose: {emotion['emotion']}\n"

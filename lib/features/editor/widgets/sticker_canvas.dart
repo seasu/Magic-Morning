@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -174,10 +176,12 @@ class _StickerCanvasState extends State<StickerCanvas> {
     super.didUpdateWidget(old);
 
     // 圖片首次到達時重置視角
+    // Gemini 產出的圓形貼圖圓圈約佔畫布 90–95%，以 1.12x 補足至填滿 ClipOval
     if (old.generatedImage == null && widget.generatedImage != null) {
       _imgOffset = Offset.zero;
-      _imgScale = 1.0;
+      _imgScale = 1.12;
       _imgAngle = 0.0;
+      widget.onTransformChanged?.call(_imgScale, _imgOffset, _imgAngle);
     }
 
     // 父層更新圖片 transform 時同步（popup 關閉後）
@@ -392,7 +396,10 @@ class _StickerCanvasState extends State<StickerCanvas> {
 
               // 圖片選取框（編輯模式下圖片被選中時）
               if (widget.enableTextGestures && _effective == StickerEditTarget.image)
-                _ImageSelectionOverlay(canvasSize: _canvasSize),
+                _ImageSelectionOverlay(
+                  canvasSize: _canvasSize,
+                  stickerShape: widget.stickerShape,
+                ),
 
               textLayer,
 
@@ -434,24 +441,39 @@ class _StickerCanvasState extends State<StickerCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = constraints.maxWidth * 0.75;
+        final size = constraints.maxWidth;
         Widget img(String asset) => Image.asset(
               asset,
               width: size,
               height: size,
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Image.asset(
                 assetFallback,
                 width: size,
                 height: size,
-                fit: BoxFit.contain,
+                fit: BoxFit.cover,
               ),
             );
-        return Container(
-          color: Colors.white,
-          child: Center(
-            child: img(assetWithEmotion ?? assetFallback),
-          ),
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            SizedBox.expand(child: img(assetWithEmotion ?? assetFallback)),
+            // 文字示意（AI 已生成文案時顯示，與最終成品相同位置）
+            if (widget.text.isNotEmpty)
+              Align(
+                alignment: Alignment(_textXAlign, _textYAlign),
+                child: Transform.rotate(
+                  angle: _textAngle,
+                  child: _TextSelectionWidget(
+                    text: widget.text,
+                    config: widget.config,
+                    fontIndex: widget.fontIndex,
+                    fontSizeScale: _textSizeScale,
+                    isSelected: false,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -574,8 +596,12 @@ class _CircleHandle extends StatelessWidget {
 
 class _ImageSelectionOverlay extends StatelessWidget {
   final Size canvasSize;
+  final StickerShape stickerShape;
 
-  const _ImageSelectionOverlay({required this.canvasSize});
+  const _ImageSelectionOverlay({
+    required this.canvasSize,
+    required this.stickerShape,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -584,7 +610,7 @@ class _ImageSelectionOverlay extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           // 邊框 + 角落控制點（CustomPainter）
-          CustomPaint(painter: _ImageSelectionPainter()),
+          CustomPaint(painter: _ImageSelectionPainter(stickerShape: stickerShape)),
 
           // 中心旋轉提示圓圈
           Center(
@@ -613,23 +639,15 @@ class _ImageSelectionOverlay extends StatelessWidget {
 }
 
 class _ImageSelectionPainter extends CustomPainter {
+  final StickerShape stickerShape;
+  const _ImageSelectionPainter({required this.stickerShape});
+
   @override
   void paint(Canvas canvas, Size size) {
     final borderPaint = Paint()
       ..color = _kHandleColor.withValues(alpha: 0.85)
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
-
-    // 畫面邊框
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTRB(4, 4, size.width - 4, size.height - 4),
-        const Radius.circular(4),
-      ),
-      borderPaint,
-    );
-
-    // 四角控制點
     final fillPaint = Paint()
       ..color = _kHandleColor
       ..style = PaintingStyle.fill;
@@ -638,19 +656,43 @@ class _ImageSelectionPainter extends CustomPainter {
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
-    for (final pt in [
-      const Offset(4, 4),
-      Offset(size.width - 4, 4),
-      Offset(4, size.height - 4),
-      Offset(size.width - 4, size.height - 4),
-    ]) {
-      canvas.drawCircle(pt, 8, fillPaint);
-      canvas.drawCircle(pt, 8, whitePaint);
+    if (stickerShape == StickerShape.circle) {
+      // ── 圓形邊框 ──────────────────────────────────────────────────
+      final center = Offset(size.width / 2, size.height / 2);
+      final radius = (size.width / 2) - 4;
+      canvas.drawCircle(center, radius, borderPaint);
+
+      // 控制點在 45° / 135° / 225° / 315° 的圓圈邊緣
+      for (final a in [pi * 0.25, pi * 0.75, pi * 1.25, pi * 1.75]) {
+        final pt = center + Offset(cos(a) * radius, sin(a) * radius);
+        canvas.drawCircle(pt, 8, fillPaint);
+        canvas.drawCircle(pt, 8, whitePaint);
+      }
+    } else {
+      // ── 方形邊框（原邏輯）──────────────────────────────────────────
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTRB(4, 4, size.width - 4, size.height - 4),
+          const Radius.circular(4),
+        ),
+        borderPaint,
+      );
+
+      for (final pt in [
+        const Offset(4, 4),
+        Offset(size.width - 4, 4),
+        Offset(4, size.height - 4),
+        Offset(size.width - 4, size.height - 4),
+      ]) {
+        canvas.drawCircle(pt, 8, fillPaint);
+        canvas.drawCircle(pt, 8, whitePaint);
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(covariant _ImageSelectionPainter old) =>
+      old.stickerShape != stickerShape;
 }
 
 // ─── 操作提示（尚未選取任何物件時）─────────────────────────────────────────
