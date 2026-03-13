@@ -31,7 +31,7 @@ final creditHistoryProvider = FutureProvider.autoDispose<List<CreditHistoryEntry
     return snap.docs.map(CreditHistoryEntry.fromDoc).toList();
   } catch (e, stack) {
     await FirebaseService.recordError(e, stack, reason: 'credit_history_load_failed');
-    return [];
+    rethrow;
   }
 });
 

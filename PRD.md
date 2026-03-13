@@ -3,7 +3,7 @@
 |---|---|
 | 專案名稱 | Magic Sticker（AI 一鍵產 LINE 貼圖） |
 | 版本號規範 | SemVer (Major.Minor.Patch+Build) |
-| 目前版本 | v3.1.59+180 |
+| 目前版本 | v3.1.65+186 |
 | 開發平台 | Flutter (Android & iOS) |
 | 監控系統 | Firebase Crashlytics & Analytics |
 | 核心技術 | Gemini 2.0 Flash Exp Image Generation（圖片生成）|
@@ -207,6 +207,12 @@ lib/
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v3.1.65 | 2026-03-14 | **fix(billing)**：`creditHistoryProvider` 改為 `rethrow` 取代 `return []`，讓 Firestore 查詢失敗時 UI 正確顯示「載入失敗，請稍後再試」而非誤顯「還沒有點數紀錄」。 |
+| v3.1.64 | 2026-03-14 | **feat(loading)**：AI 生圖 loading 動畫改為「貓咪洗臉」— `_PaintStage` → `_GroomStage`：舔爪（0~18%）→ 橢圓軌跡洗臉（18~78%）→ 落爪＋✨閃光＋💕愛心上浮（78~100%）；背景改為 🫧 泡泡漂移；訊息同步更新為洗臉主題。 |
+| v3.1.63 | 2026-03-14 | **fix(edit)**：編輯畫面圓形貼圖改用圓形虛線框 — `_BoundaryPainter` 加入 `stickerShape` 參數，圓形時改畫 `addOval` 虛線；外層 ClipRRect 圓形時改為 `ClipOval`。 |
+| v3.1.62 | 2026-03-14 | **fix(cf)**：更新 `GEMINI_TEXT_MODEL` 預設值 `gemini-2.0-flash` → `gemini-2.5-flash`（2.0-flash 將於 2026-06-01 退役；`gemini-3-flash` 為不存在的 model ID，導致 404 錯誤）。 |
+| v3.1.61 | 2026-03-13 | **fix(canvas)**：編輯 popup 也套用 Auto-fit — `initState` 補上 `_autoFitGeneratedImage()` 呼叫，解決編輯畫面開啟時 `generatedImage` 已存在導致 `didUpdateWidget` 條件不觸發的問題。 |
+| v3.1.60 | 2026-03-13 | **feat(canvas)**：AI 圓形貼圖自動填滿畫布 — (1) Gemini Prompt 修正：圓圈改為填滿 100% 畫布、明確禁止任何顏色的描邊/外框；(2) `StickerCanvas` 新增 `_autoFitGeneratedImage()`：圖片首次到達時以 `compute()` 在 isolate 偵測非透明 bounding box，計算精確 scale（1.05× overshoot 裁掉殘留薄邊框），取代固定 `1.12×`。 |
 | v3.1.59 | 2026-03-13 | **chore**：merge main (v3.1.55+176) → `claude/fix-gemini-auth-errors-O28Sx`，解決 PR #129 版本衝突，版本遞增至 v3.1.59+180。 |
 | v3.1.55 | 2026-03-13 | **chore**：解決 PR #129 合併衝突（同步版本文件），更新 `pubspec.yaml` 與 `PRD.md` 版本號，確保分支可順利合併。 |
 | v3.1.51 | 2026-03-13 | **fix(ux)**：情感標籤 fallback + EmotionPickerSheet 捲動修復 — (1) `_EmotionLabel` 改為 fallback：AI 未回傳 categoryId（舊 CF 版本）時自動使用 `selectedCategoryIds[i]`，確保標籤永遠顯示；(2) `EmotionPickerSheet` 外層改為 `SingleChildScrollView`，防止 4×4 格在小螢幕溢出並確保確認按鈕可見；(3) 標題列選取數改為即時顯示「已選 N 種（4–12）」 |
