@@ -1345,10 +1345,10 @@ class _FunLoadingViewState extends State<_FunLoadingView>
 
   // AI 繪製貼圖圖片階段（付費）
   static const _imageMessages = [
-    '🖌️ AI 畫師提筆作畫中…',
-    '🎨 上色、調整細節…',
+    '🐾 貓咪洗臉中，AI 同步繪圖…',
+    '💧 仔細清潔每個細節…',
     '✨ 魔法特效施工中…',
-    '🐱 貓咪監工，確保品質！',
+    '🫧 洗白白了！快好了…',
     '💨 快完成了，再等一下！',
   ];
 
@@ -1428,8 +1428,8 @@ class _FunLoadingViewState extends State<_FunLoadingView>
           Expanded(
             flex: 7,
             child: widget.isImageGen
-                ? _PaintStage(
-                    paintCtrl: _chaseCtrl,
+                ? _GroomStage(
+                    groomCtrl: _chaseCtrl,
                     bounceCtrl: _bounceCtrl,
                     driftCtrl: _cloudCtrl,
                   )
@@ -1721,20 +1721,19 @@ class _ChaseStage extends StatelessWidget {
 
 /// 貓咪坐在畫架前揮動畫筆，筆刷左右掃過畫布，顏料星芒飛濺。
 /// 使用與 [_ChaseStage] 相同的三個 controller 以共用 [_FunLoadingView] 初始化邏輯。
-class _PaintStage extends StatelessWidget {
-  final AnimationController paintCtrl;  // 3800 ms loop → 筆刷擺動 + 星芒閃爍
-  final AnimationController bounceCtrl; // 420 ms loop  → 顏料粒子跳動
-  final AnimationController driftCtrl;  // 9000 ms loop → 背景星星漂移
+class _GroomStage extends StatelessWidget {
+  final AnimationController groomCtrl;  // 3800 ms loop → 爪子軌跡 + 閃光
+  final AnimationController bounceCtrl; // 420 ms loop  → 水花跳動（保留但未用）
+  final AnimationController driftCtrl;  // 9000 ms loop → 背景泡泡漂移
 
-  const _PaintStage({
-    required this.paintCtrl,
+  const _GroomStage({
+    required this.groomCtrl,
     required this.bounceCtrl,
     required this.driftCtrl,
   });
 
-  static const _catSize = 90.0;
-  static const _brushSize = 48.0;
-  static const _canvasSize = 86.0;
+  static const _catSize = 100.0;
+  static const _pawSize = 36.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1742,36 +1741,45 @@ class _PaintStage extends StatelessWidget {
       final w = box.maxWidth;
       final h = box.maxHeight;
       final groundY = h * 0.62;
-      final charBaseY = groundY - _catSize + 6;
+      final catBaseY = groundY - _catSize + 8;
 
-      // 相對位置：貓在左 1/4，畫架在右 3/5
-      final catX = w * 0.08;
-      final easelX = w * 0.54;
-      // 筆刷中心點 = 畫布左緣前方一點
-      final brushCenterX = easelX - 10;
-      final brushCenterY = charBaseY + 14.0;
+      // 貓咪置中，臉部中心（約 emoji 頂部 28%）
+      final catCenterX = w * 0.5 - _catSize / 2;
+      final faceCenterX = catCenterX + _catSize * 0.48;
+      final faceCenterY = catBaseY + _catSize * 0.28;
 
       return Stack(clipBehavior: Clip.none, children: [
-        // ── 漂移星點（背景）─────────────────────────────────────────────
+        // ── 漂浮泡泡（背景）─────────────────────────────────────────────
         AnimatedBuilder(
           animation: driftCtrl,
           builder: (_, __) {
             final t = driftCtrl.value;
+            final b2 = (t + 0.35) % 1.0;
+            final b3 = (t + 0.68) % 1.0;
             return Stack(children: [
               Positioned(
-                left: (w * (0.05 + t * 0.55)) % (w + 70) - 35,
-                top: h * 0.05,
-                child: const Text('⭐', style: TextStyle(fontSize: 28)),
+                left: w * 0.18 + 12 * sin(t * 2 * pi),
+                top: h * 0.58 - t * h * 0.70,
+                child: Opacity(
+                  opacity: sin(t * pi).clamp(0.0, 0.70),
+                  child: const Text('🫧', style: TextStyle(fontSize: 22)),
+                ),
               ),
               Positioned(
-                left: (w * (0.50 + t * 0.40)) % (w + 60) - 30,
-                top: h * 0.16,
-                child: const Text('🌟', style: TextStyle(fontSize: 22)),
+                left: w * 0.72 + 10 * cos(b2 * 2 * pi),
+                top: h * 0.58 - b2 * h * 0.70,
+                child: Opacity(
+                  opacity: sin(b2 * pi).clamp(0.0, 0.60),
+                  child: const Text('🫧', style: TextStyle(fontSize: 16)),
+                ),
               ),
               Positioned(
-                left: (w * (0.20 + t * 0.30)) % (w + 50) - 25,
-                top: h * 0.03,
-                child: const Text('✨', style: TextStyle(fontSize: 18)),
+                left: w * 0.44 + 8 * sin(b3 * 2 * pi),
+                top: h * 0.58 - b3 * h * 0.70,
+                child: Opacity(
+                  opacity: sin(b3 * pi).clamp(0.0, 0.55),
+                  child: const Text('💧', style: TextStyle(fontSize: 13)),
+                ),
               ),
             ]);
           },
@@ -1809,110 +1817,126 @@ class _PaintStage extends StatelessWidget {
 
         // ── 主動畫 ───────────────────────────────────────────────────────
         AnimatedBuilder(
-          animation: Listenable.merge([paintCtrl, bounceCtrl]),
+          animation: groomCtrl,
           builder: (_, __) {
-            final t = paintCtrl.value;
-            final b = bounceCtrl.value;
+            final t = groomCtrl.value;
 
-            // 筆刷：橢圓軌跡（模擬塗抹動作）
-            final strokeX = 22.0 * cos(t * pi * 5);
-            final strokeY = -10.0 * sin(t * pi * 5);
+            // ── 三段動畫：舔爪 → 橢圓洗臉 → 落爪＋閃光 ──────────────
+            const lickEnd = 0.18; // 0.0~0.18：爪子舉起到嘴邊
+            const rubEnd  = 0.78; // 0.18~0.78：橢圓軌跡洗臉（一圈）
+            // 0.78~1.00：爪子落下＋閃光＋愛心
 
-            // 顏料星芒：三顆以不同相位閃爍
-            final sp1 = (sin(t * pi * 6 + 0.0) * 0.5 + 0.5).clamp(0.0, 1.0);
-            final sp2 = (sin(t * pi * 6 + 2.1) * 0.5 + 0.5).clamp(0.0, 1.0);
-            final sp3 = (sin(t * pi * 6 + 4.2) * 0.5 + 0.5).clamp(0.0, 1.0);
+            const rubRx = 20.0; // 橢圓 X 半徑（跨越臉部寬度）
+            const rubRy = 11.0; // 橢圓 Y 半徑（眉心到臉頰幅度）
 
-            // 顏料粒子（使用 bounceCtrl 相位）
-            final dropBob1 = -7.0 * sin(b * pi);
-            final dropBob2 = -7.0 * sin((b + 0.5) * pi);
+            late double pawX, pawY, pawAngle;
+            double tongueOpacity = 0;
+            double dropOpacity   = 0;
+            double sparkOpacity  = 0;
+            double heartRise     = 0;
+
+            if (t < lickEnd) {
+              // Phase 1：爪子從腹部緩緩舉起到嘴邊
+              final p = Curves.easeInOut.transform(t / lickEnd);
+              pawX     = faceCenterX - _pawSize * 0.5 + 4 * (1 - p);
+              pawY     = catBaseY + _catSize * 0.68 - _catSize * 0.44 * p;
+              pawAngle = -0.4 * p;
+              tongueOpacity = (p > 0.55 ? (p - 0.55) / 0.45 : 0.0).clamp(0.0, 1.0);
+            } else if (t < rubEnd) {
+              // Phase 2：橢圓洗臉軌跡（從額頭出發順時針繞一圈）
+              final p     = (t - lickEnd) / (rubEnd - lickEnd); // 0→1
+              final angle = p * 2 * pi - pi * 0.5; // 從頂部（額頭）開始
+              pawX     = faceCenterX + rubRx * cos(angle) - _pawSize * 0.5;
+              pawY     = faceCenterY + rubRy * sin(angle) - _pawSize * 0.5;
+              pawAngle = angle * 0.22;
+              dropOpacity = sin(p * pi).clamp(0.0, 1.0);
+            } else {
+              // Phase 3：爪子落回 + 閃光 + 愛心上浮
+              final p  = Curves.easeOut.transform((t - rubEnd) / (1.0 - rubEnd));
+              pawX     = faceCenterX - _pawSize * 0.5;
+              pawY     = catBaseY + _catSize * 0.24 + _catSize * 0.44 * p;
+              pawAngle = 0;
+              sparkOpacity = (1 - p * 2.2).clamp(0.0, 1.0);
+              heartRise    = p;
+            }
 
             return Stack(children: [
-              // 🎨 調色盤（貓腳邊）
+              // 🐱 貓咪（置中）
               Positioned(
-                left: catX + _catSize * 0.55,
-                top: charBaseY + _catSize * 0.72,
-                child: const Text('🎨', style: TextStyle(fontSize: 30)),
-              ),
-
-              // 顏料粒子跳動
-              Positioned(
-                left: catX + _catSize * 0.55 + 6,
-                top: charBaseY + _catSize * 0.55 + dropBob1,
-                child: Opacity(
-                  opacity: 0.75,
-                  child: const Text('🔴', style: TextStyle(fontSize: 13)),
-                ),
-              ),
-              Positioned(
-                left: catX + _catSize * 0.55 + 22,
-                top: charBaseY + _catSize * 0.58 + dropBob2,
-                child: Opacity(
-                  opacity: 0.75,
-                  child: const Text('🔵', style: TextStyle(fontSize: 13)),
-                ),
-              ),
-              Positioned(
-                left: catX + _catSize * 0.55 + 14,
-                top: charBaseY + _catSize * 0.48 + dropBob1,
-                child: Opacity(
-                  opacity: 0.75,
-                  child: const Text('🟡', style: TextStyle(fontSize: 12)),
-                ),
-              ),
-
-              // 🖼️ 畫布（固定）
-              Positioned(
-                left: easelX,
-                top: charBaseY - 18,
-                child: const Text('🖼️',
-                    style: TextStyle(fontSize: _canvasSize)),
-              ),
-
-              // 顏料飛濺 — 畫布周圍
-              Positioned(
-                left: easelX + _canvasSize * 0.85,
-                top: charBaseY - 28,
-                child: Opacity(
-                  opacity: sp1,
-                  child: const Text('✨', style: TextStyle(fontSize: 20)),
-                ),
-              ),
-              Positioned(
-                left: easelX + _canvasSize * 0.55,
-                top: charBaseY - 48,
-                child: Opacity(
-                  opacity: sp2,
-                  child: const Text('💫', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-              Positioned(
-                left: easelX + _canvasSize * 0.80,
-                top: charBaseY + _canvasSize * 0.45,
-                child: Opacity(
-                  opacity: sp3,
-                  child: const Text('⭐', style: TextStyle(fontSize: 14)),
-                ),
-              ),
-
-              // 🖌️ 筆刷（掃描塗抹軌跡）
-              Positioned(
-                left: brushCenterX + strokeX,
-                top: brushCenterY + strokeY,
-                child: Transform.rotate(
-                  angle: -0.6 + strokeX * 0.015, // 隨掃動微微傾斜
-                  child: const Text('🖌️',
-                      style: TextStyle(fontSize: _brushSize)),
-                ),
-              ),
-
-              // 🐱 貓咪（坐著，面朝畫架）
-              Positioned(
-                left: catX,
-                top: charBaseY,
+                left: catCenterX,
+                top: catBaseY,
                 child: const Text('🐱',
                     style: TextStyle(fontSize: _catSize)),
               ),
+
+              // 👅 舌頭提示（舔爪階段末）
+              if (tongueOpacity > 0.05)
+                Positioned(
+                  left: faceCenterX - 6,
+                  top: faceCenterY + 14,
+                  child: Opacity(
+                    opacity: tongueOpacity,
+                    child: const Text('👅',
+                        style: TextStyle(fontSize: 13)),
+                  ),
+                ),
+
+              // 🐾 貓爪（動畫主角）
+              Positioned(
+                left: pawX,
+                top: pawY,
+                child: Transform.rotate(
+                  angle: pawAngle,
+                  child: const Text('🐾',
+                      style: TextStyle(fontSize: _pawSize)),
+                ),
+              ),
+
+              // 💦 水花（洗臉階段）
+              if (dropOpacity > 0.15)
+                Positioned(
+                  left: pawX + 28,
+                  top: pawY - 8,
+                  child: Opacity(
+                    opacity: (dropOpacity * 0.85).clamp(0.0, 1.0),
+                    child: const Text('💦',
+                        style: TextStyle(fontSize: 14)),
+                  ),
+                ),
+              if (dropOpacity > 0.35)
+                Positioned(
+                  left: pawX - 10,
+                  top: pawY - 14,
+                  child: Opacity(
+                    opacity: (dropOpacity * 0.65).clamp(0.0, 1.0),
+                    child: const Text('💧',
+                        style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+
+              // ✨ 洗好了閃光
+              if (sparkOpacity > 0.05)
+                Positioned(
+                  left: faceCenterX - 14,
+                  top: faceCenterY - 28,
+                  child: Opacity(
+                    opacity: sparkOpacity,
+                    child: const Text('✨',
+                        style: TextStyle(fontSize: 28)),
+                  ),
+                ),
+
+              // 💕 愛心上浮
+              if (heartRise > 0 && heartRise < 0.72)
+                Positioned(
+                  left: faceCenterX + 20,
+                  top: faceCenterY - 8 - heartRise * 38,
+                  child: Opacity(
+                    opacity: ((0.72 - heartRise) / 0.72).clamp(0.0, 1.0),
+                    child: const Text('💕',
+                        style: TextStyle(fontSize: 18)),
+                  ),
+                ),
             ]);
           },
         ),
