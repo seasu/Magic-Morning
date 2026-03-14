@@ -25,7 +25,7 @@ final creditHistoryProvider = FutureProvider.autoDispose<List<CreditHistoryEntry
   // userChanges() can emit before the token propagates to Firestore,
   // which causes transient permission-denied errors on first load or
   // after linkWithCredential (anonymous → real account upgrade).
-  await user.getIdToken();
+  await user.getIdToken(true);
 
   try {
     final snap = await FirebaseFirestore.instance
@@ -37,10 +37,11 @@ final creditHistoryProvider = FutureProvider.autoDispose<List<CreditHistoryEntry
         .get();
     return snap.docs.map(CreditHistoryEntry.fromDoc).toList();
   } on FirebaseException catch (e, stack) {
-    if (e.code == 'permission-denied') {
+    // e.code can be 'permission-denied' or 'cloud_firestore/permission-denied'
+    // depending on the SDK version; use contains() for safety.
+    if (e.code.contains('permission-denied')) {
       // Transient auth state (e.g. mid-transition after linkWithCredential).
-      // Return empty rather than crashing the UI; token refresh above should
-      // prevent this in steady state.
+      // Return empty rather than crashing the UI.
       FirebaseService.log(
         'creditHistoryProvider: permission-denied for uid=${user.uid} — returning []',
       );
