@@ -201,7 +201,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       fontSize: 38,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
-                      height: 1.1,
+                      height: 1.2,
                     ),
                     textAlign: TextAlign.center,
                   ),
