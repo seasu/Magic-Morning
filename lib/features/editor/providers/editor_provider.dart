@@ -234,11 +234,14 @@ class _EditorFamilyNotifier
                 styleIndex: styleIdx,
                 shape: state.stickerShape,
               )
-              .catchError((Object e, StackTrace s) => FirebaseService.recordError(
-                    e,
-                    s,
-                    reason: 'sticker_archive_failed_index$index',
-                  )),
+              .catchError((Object e, StackTrace s) {
+                FirebaseService.recordError(
+                  e,
+                  s,
+                  reason: 'sticker_archive_failed_index$index',
+                );
+                return null;
+              }),
         );
       }
 
