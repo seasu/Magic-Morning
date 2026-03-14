@@ -98,13 +98,14 @@ class _StickerReplayScreenState extends State<StickerReplayScreen> {
         }),
         onFontChanged: (fi) => setState(() => _fontIndex = fi),
         onStyleChanged: (si) => setState(() => _styleIndex = si),
-        onTextGestureChanged: (xAlign, yAlign, angle, sizeScale) =>
-            setState(() {
-          _textXAlign = xAlign;
-          _textYAlign = yAlign;
-          _textAngle = angle;
-          _fontSizeScale = sizeScale;
-        }),
+        onTextGestureChanged: (xAlign, yAlign, angle, sizeScale) {
+          setState(() {
+            _textXAlign = xAlign;
+            _textYAlign = yAlign;
+            _textAngle = angle;
+            _fontSizeScale = sizeScale;
+          });
+        },
       ),
     );
   }
