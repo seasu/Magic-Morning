@@ -222,39 +222,95 @@ class _StickerCanvasState extends State<StickerCanvas> {
     }
   }
 
-  // ── Auto-fit: 偵測非透明 bounding box，縮放至填滿畫布 ──────────────────────
+  // ── Auto-fit: 偵測彩色內容 bounding box，縮放並置中至填滿畫布 ────────────
 
-  /// 在 isolate 中執行（透過 compute）。回傳 [minX, minY, maxX, maxY, imageWidth]。
+  /// 在 isolate 中執行（透過 compute）。
+  /// 回傳 [minX, minY, maxX, maxY, imageWidth, imageHeight]。
+  ///
+  /// 跳過兩類像素：
+  ///   ① 透明（alpha ≤ 10）
+  ///   ② 近黑色（R < 40 && G < 40 && B < 40）— 排除貼圖外框線，只看彩色內容
+  ///
+  /// 若排除黑色後找不到有效像素，fallback 到只用 alpha 偵測。
   static List<int>? _findContentBounds(Uint8List bytes) {
     final image = img.decodeImage(bytes);
     if (image == null) return null;
     final data = image.getBytes(order: img.ChannelOrder.rgba);
     final w = image.width;
     final h = image.height;
+
+    // Pass 1：彩色像素（排除透明 + 近黑色外框）
     int minX = w, maxX = 0, minY = h, maxY = 0;
     for (int y = 0; y < h; y++) {
       for (int x = 0; x < w; x++) {
-        if (data[(y * w + x) * 4 + 3] > 10) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
+        final i = (y * w + x) * 4;
+        if (data[i + 3] <= 10) continue; // 透明
+        final r = data[i], g = data[i + 1], b = data[i + 2];
+        if (r < 40 && g < 40 && b < 40) continue; // 近黑色外框
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    // Pass 2 fallback：若彩色像素全無（全黑圖或純黑背景），改用 alpha 偵測
+    if (minX >= maxX || minY >= maxY) {
+      minX = w; maxX = 0; minY = h; maxY = 0;
+      for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+          if (data[(y * w + x) * 4 + 3] > 10) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
         }
       }
     }
+
     if (minX >= maxX || minY >= maxY) return null;
-    return [minX, minY, maxX, maxY, w];
+    return [minX, minY, maxX, maxY, w, h];
   }
 
   void _autoFitGeneratedImage(Uint8List bytes) {
+    // 若畫布尚未 layout（initState 首次呼叫時 _canvasSize == Size.zero），
+    // 延至下一幀再執行，確保置中計算有正確的 _canvasSize。
+    if (_canvasSize == Size.zero) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _autoFitGeneratedImage(bytes);
+      });
+      return;
+    }
+
     compute(_findContentBounds, bytes).then((bounds) {
       if (!mounted || bounds == null) return;
-      final contentSize =
-          max(bounds[2] - bounds[0], bounds[3] - bounds[1]).toDouble();
-      final fullSize = bounds[4].toDouble();
-      // 1.05× overshoot → 把任何殘留薄邊框推到 ClipOval 外面裁掉
-      final newScale = (fullSize / contentSize * 1.05).clamp(1.0, 3.0);
-      setState(() => _imgScale = newScale);
+
+      final minX = bounds[0].toDouble();
+      final minY = bounds[1].toDouble();
+      final maxX = bounds[2].toDouble();
+      final maxY = bounds[3].toDouble();
+      final iW   = bounds[4].toDouble();
+      final iH   = bounds[5].toDouble();
+
+      // Scale：讓彩色內容最大軸填滿圓框（1.05× 把殘留外框薄邊推到 ClipOval 外）
+      final contentSize = max(maxX - minX, maxY - minY);
+      final newScale = (max(iW, iH) / contentSize * 1.05).clamp(1.0, 3.0);
+
+      // Offset：把彩色內容中心對齊畫布中心
+      // Transform 順序：先 Translate（_imgOffset）再 Scale（_imgScale，從畫布中心縮放）
+      // 公式：offset = (canvasCenter - naturalContentCenter) × newScale
+      final cx = (minX + maxX) / 2.0;
+      final cy = (minY + maxY) / 2.0;
+      final naturalCx = cx * (_canvasSize.width  / iW);
+      final naturalCy = cy * (_canvasSize.height / iH);
+      final dx = (_canvasSize.width  / 2.0 - naturalCx) * newScale;
+      final dy = (_canvasSize.height / 2.0 - naturalCy) * newScale;
+
+      setState(() {
+        _imgScale  = newScale;
+        _imgOffset = Offset(dx, dy);
+      });
       widget.onTransformChanged?.call(_imgScale, _imgOffset, _imgAngle);
     });
   }
