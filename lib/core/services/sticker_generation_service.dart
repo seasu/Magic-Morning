@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/sticker_shape.dart';
 import '../models/sticker_spec.dart';
@@ -50,9 +50,21 @@ class StickerGenerationService {
           options: HttpsCallableOptions(timeout: const Duration(seconds: 125)),
         );
 
+        final prompt = _buildSinglePrompt(spec, style, shape);
+
+        if (kDebugMode) {
+          debugPrint(
+            '\n══════════════════════════════════\n'
+            '🎨 Sticker Prompt [index=$index style=${style.name}]\n'
+            '══════════════════════════════════\n'
+            '$prompt'
+            '══════════════════════════════════\n',
+          );
+        }
+
         final result = await callable.call<Map<String, dynamic>>({
           'photoBase64': base64Encode(photoBytes),
-          'prompt': _buildSinglePrompt(spec, style, shape),
+          'prompt': prompt,
         });
 
         final imageBase64 = result.data['imageBase64'] as String;
