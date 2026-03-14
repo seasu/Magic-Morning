@@ -1377,7 +1377,7 @@ class _FunLoadingViewState extends State<_FunLoadingView>
       duration: const Duration(milliseconds: 380),
     )..repeat(reverse: true);
 
-    _videoCtrl = VideoPlayerController.asset('assets/loading_animation.mp4')
+    _videoCtrl = VideoPlayerController.asset('assets/loading_animation-square.mp4')
       ..initialize().then((_) {
         if (mounted) {
           _videoCtrl
