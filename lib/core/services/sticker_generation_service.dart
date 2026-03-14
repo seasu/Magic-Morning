@@ -206,43 +206,43 @@ class StickerGenerationService {
       StickerSpec spec, StickerStyle style, StickerShape shape) {
     if (shape == StickerShape.circle) {
       return '''
-You are a professional LINE sticker illustrator. Create ONE circular sticker PNG based on the reference photo.
+你是一位專業的 LINE 貼圖插畫師。請根據參考照片，繪製一張圓形貼圖 PNG。
 
-CANVAS (CRITICAL — follow exactly):
-- Square canvas, transparent outside the circle
-- ONE perfect filled circle with diameter = 100% of canvas width and height
-- Circle center = exact canvas center; edges touch all 4 sides (top, bottom, left, right) with zero gap
-- The 4 corner pixels of the canvas MUST be fully transparent (alpha = 0)
-- Circle edge: hard sharp alpha cutoff to transparent — absolutely NO outline, border, ring, or stroke of any color
+【畫布規格（必須嚴格遵守）】
+- 正方形畫布，圓形外部完全透明
+- 一個完美的填色圓形，直徑 = 畫布寬度 = 畫布高度（100% 填滿）
+- 圓心 = 畫布正中央；圓形邊緣緊貼畫布上下左右四邊，無任何空隙
+- 畫布四個角落的像素必須完全透明（alpha = 0）
+- 圓形邊緣：直接以透明像素 hard cutoff，絕對不可有任何顏色的外框、描邊、光暈或邊線
 
-CHARACTER (inside the circle):
-- Cute Q-version chibi cartoon of the person in the reference photo
-- Expression / pose: ${spec.emotion}
+【角色設計（圓形內部）】
+- 根據參考照片，繪製可愛 Q 版卡通人物
+- 表情 / 動作：${spec.emotion}
 - ${style.characterDesc}
-- Place the character in the upper-center area of the circle (roughly the top 70% of the circle height)
-- DO NOT include any text, letters, or numbers
+- 將角色置於圓形的上半部至中央（約佔圓形高度的上方 70%）
+- 禁止出現任何文字、英文字母或數字
 
-DECORATIONS: 2–4 small sparkles or stars scattered inside the circle only
+【裝飾】在圓形內部點綴 2–4 個小閃光或星星
 
-COLORS: Circle fill = ${spec.bgColor}
+【配色】圓形背景色：${spec.bgColor}
 
-OUTPUT: Single square PNG — circle fills 100% of canvas, transparent outside the circle.
-STYLE: ${style.promptSuffix}
+【輸出】單一正方形 PNG，圓形填滿畫布 100%，圓外完全透明。
+風格：${style.promptSuffix}
 ''';
     } else {
       return '''
-You are a professional LINE sticker illustrator. Draw ONE single square sticker based on the person's face in the reference photo.
+你是一位專業的 LINE 貼圖插畫師。請根據參考照片，繪製一張方形貼圖。
 
-DESIGN REQUIREMENTS:
-- Fill the entire square canvas with ${spec.bgColor} as the background
-- Character expression / pose: ${spec.emotion}
+【設計規格】
+- 整個正方形畫布以 ${spec.bgColor} 填色作為背景
+- 角色表情 / 動作：${spec.emotion}
 - ${style.characterDesc}
-- DO NOT draw any text or letters inside the image
-- 3–5 small sparkles / stars scattered in the background
-- NO white border or white outline anywhere
+- 畫面內禁止出現任何文字或英文字母
+- 背景中點綴 3–5 個小閃光或星星
+- 禁止出現任何白色邊框或白色描邊
 
-OUTPUT: A single square PNG containing exactly this ONE sticker with no white background.
-STYLE: ${style.promptSuffix}
+【輸出】單一正方形 PNG，無白色背景。
+風格：${style.promptSuffix}
 ''';
     }
   }
