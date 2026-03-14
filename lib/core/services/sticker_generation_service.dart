@@ -206,20 +206,27 @@ class StickerGenerationService {
       StickerSpec spec, StickerStyle style, StickerShape shape) {
     if (shape == StickerShape.circle) {
       return '''
-You are a professional LINE sticker illustrator. Draw ONE single circular sticker based on the person's face in the reference photo.
+You are a professional LINE sticker illustrator. Create ONE circular sticker PNG based on the reference photo.
 
-DESIGN REQUIREMENTS:
-- A single large filled perfect circle, centered, filling exactly 100% of the square canvas — the circle's outer edge must touch all four sides of the canvas with zero padding
-- The circle must be geometrically perfect (equal width and height)
-- Circle background color: ${spec.bgColor}
-- Character expression / pose: ${spec.emotion}
+CANVAS (CRITICAL — follow exactly):
+- Square canvas, transparent outside the circle
+- ONE perfect filled circle with diameter = 100% of canvas width and height
+- Circle center = exact canvas center; edges touch all 4 sides (top, bottom, left, right) with zero gap
+- The 4 corner pixels of the canvas MUST be fully transparent (alpha = 0)
+- Circle edge: hard sharp alpha cutoff to transparent — absolutely NO outline, border, ring, or stroke of any color
+
+CHARACTER (inside the circle):
+- Cute Q-version chibi cartoon of the person in the reference photo
+- Expression / pose: ${spec.emotion}
 - ${style.characterDesc}
-- DO NOT draw any text or letters inside the image
-- 3–5 small sparkles / stars scattered inside the circle
-- The circle must have NO outline, NO border, NO ring, NO stroke of any color — the circle edge is a clean, sharp transition directly to the transparent background with zero margin
-- The area outside the circle must be completely transparent (alpha = 0), no fill at all
+- Place the character in the upper-center area of the circle (roughly the top 70% of the circle height)
+- DO NOT include any text, letters, or numbers
 
-OUTPUT: A single square PNG (equal width and height) with a transparent background outside the circle, containing exactly this ONE circular sticker.
+DECORATIONS: 2–4 small sparkles or stars scattered inside the circle only
+
+COLORS: Circle fill = ${spec.bgColor}
+
+OUTPUT: Single square PNG — circle fills 100% of canvas, transparent outside the circle.
 STYLE: ${style.promptSuffix}
 ''';
     } else {
