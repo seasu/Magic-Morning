@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/sticker_style.dart';
@@ -176,12 +177,17 @@ class _StickerCard extends StatelessWidget {
     onDeleted();
   }
 
+  void _openReplay(BuildContext context) {
+    context.push('/sticker-replay', extra: record);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCircle = record.shapeStr == 'circle';
     final file = File(record.filePath);
 
     return GestureDetector(
+      onTap: () => _openReplay(context),
       onLongPress: () => _confirmDelete(context),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(isCircle ? 200 : 16),
