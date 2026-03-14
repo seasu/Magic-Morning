@@ -208,6 +208,7 @@ lib/
 | 版本 | 日期 | 摘要 |
 |---|---|---|
 | v3.1.77 | 2026-03-14 | **feat(loading)**：以影片取代 Flutter 手刻 loading 動畫 — (1) 新增 `video_player: ^2.9.2` 依賴；(2) `_FunLoadingViewState` 改用 `VideoPlayerController.asset('assets/loading_animation.mp4')`，靜音迴圈播放，`FittedBox.cover` 填滿 70% 動畫區；(3) 刪除 `_ChaseStage`、`_GroomStage`（共 -423 行）；(4) 更新 `_imageMessages` 移除「貓洗臉」文案；(5) 保留相同的旋轉提示文字 + `_BounceDots` 進度指示器；錯誤 fallback：影片初始化失敗時靜默降級（`_videoError = true`）不 crash。 |
+| v3.1.82 | 2026-03-14 | **chore(assets)**：替換 loading 動畫為 `loading_animation-square.mp4`，`VideoPlayerController` 對應更新。 |
 | v3.1.81 | 2026-03-14 | **fix(prompt)**：Gemini 圖片生成 Prompt 全面改為繁體中文 — `sticker_generation_service.dart` 圓形／方形 Prompt 主體翻譯為中文結構（【畫布規格】【角色設計】【裝飾】【配色】【輸出】）；`sticker_style.dart` 的 `characterDesc`（6 種風格）與 `promptSuffix`（6 種風格）同步中文化，動態變數（`spec.emotion`、`spec.bgColor`）仍維持英文。 |
 | v3.1.80 | 2026-03-14 | **fix(precision)**：優化貼圖精準度 — (1) `sticker_canvas.dart` Auto-fit scale 改用正確 Cover 公式：`max(iW/contentW, iH/contentH) × 1.05`，修正原本 `max÷max` 導致非正方形內容短軸留空隙的問題；(2) `sticker_generation_service.dart` 強化圓形 Prompt：改為逐項 CRITICAL 結構，新增「4 corner pixels MUST be transparent」具體約束、明確指定角色位於圓圈上方 70% 區域、circle edge 改為「hard sharp alpha cutoff」措辭，提升 Gemini 理解精準度。 |
 | v3.1.79 | 2026-03-14 | **chore(deps)**：`flutter pub get` 解析 `in_app_purchase ^3.2.0` 全部 transitive 依賴，更新 `pubspec.lock`（`in_app_purchase 3.2.3`、`in_app_purchase_android`、`in_app_purchase_platform_interface` 等）。 |
